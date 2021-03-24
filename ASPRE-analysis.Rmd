@@ -1,0 +1,58 @@
+---
+title: "ASPRE-analysis"
+author: "Xiqi Li"
+date: "3/23/2021"
+output: 
+  html_document:
+    number_sections: TRUE
+    code_folding: hide
+    toc: true
+    toc_depth: 3
+    theme: cosmo
+editor_options: 
+  
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "/Volumes/Seagate-2C/BaylorMHG/PE_ASA/ASPRE-analysis/data")
+setwd("/Volumes/Seagate-2C/BaylorMHG/PE_ASA/ASPRE-analysis/data")
+```
+
+## Data Quality Control
+1. Get z-score matrix of all frequently-detected molecules (dectected and z-scored in more than 80% samples) for all 198 samples.
+2. PCA Visualizaion of samples by metabolon. profiling batches, as well as stage of pregnancy (trimesters) when samples were collected - **Figure S2a**
+3. UMAP Visualizaion - **Figure S2b,c**
+4. Outilers were removed from downstream analysis
+
+```{r Data-Quality-Control,echo=FALSE,warning=FALSE,message=FALSE,fig.width=6,fig.height=3,fig.align='center'}
+rm(list = ls())
+require(devtools)
+require(repmis)
+require(plotly)
+require(R.utils)
+require(ggpubr)
+invisible(source_data("https://github.com/BRL-BCM/ASPRE-analysis/raw/main/data/dataSet.RData?raw=True"))
+source_url("https://github.com/BRL-BCM/ASPRE-analysis/raw/main/R/func.R")
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

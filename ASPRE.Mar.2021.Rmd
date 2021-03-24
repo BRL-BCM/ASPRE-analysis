@@ -1,10 +1,5 @@
 ---
 title: "ASPRE-analysis"
-knit: (function(input_file, encoding) {
-  out_dir <- 'docs';
-  rmarkdown::render(input_file,
-  encoding=encoding,
-  output_file=file.path(dirname(input_file), out_dir, 'index.html'))})
 author: "Xiqi Li"
 date: "3/23/2021"
 output: 
@@ -21,20 +16,8 @@ editor_options:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-<<<<<<< HEAD
 knitr::opts_knit$set(root.dir = "/Volumes/Seagate-2C/BaylorMHG/PE_ASA/ASPRE-analysis/data")
-
 setwd("/Volumes/Seagate-2C/BaylorMHG/PE_ASA/ASPRE-analysis/data")
-load(file = "/Volumes/Seagate-2C/BaylorMHG/PE_ASA/ASPRE-analysis/data/dataSet.RData")
-=======
-knitr::opts_knit$set(root.dir = "/Volumes/Seagate-2C/BaylorMHG/PE_ASA/ASPRE-analysis/docs")
-
-setwd("/Volumes/Seagate-2C/BaylorMHG/PE_ASA/ASPRE-analysis/docs")
-# load(file = "/Volumes/Seagate-2C/BaylorMHG/PE_ASA/GitHub.Mar.2021/dataSet.RData")
->>>>>>> 617d471d8ce35d0fd1606f022b7161eb41c8b716
-# dataset=dataset[c("data_zscore","data_raw")]
-# sampleAttr=sampleAttr[,c("sIDs","ga.w","ptIDs","ASA","pt_compliance","Compliance....","pe","trimester","tri_pe","ASA_tri","ASA_tri_chr","pe.risk","consss_batch")]
-# save(compAnno,dataset,sampleAttr,file="/Volumes/Seagate-2C/BaylorMHG/PE_ASA/ASPRE-analysis/data/dataSet.RData")
 ```
 
 ## Data Quality Control
@@ -354,6 +337,7 @@ invisible(mkdirs(dir.output))
 # df.vol=metReport$volcano.ASA_tri.df
 # save(df.vol,file=sprintf("%s/FourGroup.ttest.RData",dir.output))
 # write.xlsx(MOF.df,file=sprintf("%s/Table.UVA.xlsx",dir.output))
+
 ```
 
 ## Multivariate analysis (MVA)
@@ -811,7 +795,7 @@ p2=p
 # ggsave(p,filename = sprintf("%s/PREG.PredictedGAdensity.pdf",dir.output),height = 4,width = 4,device = cairo_pdf)
 # ggsave(p,filename = sprintf("%s/PREG.PredictedGAdensity.svg",dir.output),height = 4,width = 4,device = svglite)
 
-<<<<<<< HEAD
+
 #residual plot
 model<-lm(Predicted~Actual,data=df[df$group!="2nd trimester, aspirin-treated",])
 require(Metrics)
@@ -837,7 +821,7 @@ p1+labs(title = "Gestational age estimation by metabolic clock trained on sample
 p2+labs(title = "Aspirin-treated samples were estimated to have a younger gestational age then placebo-treated samples, depicted by the left-shift of green peak from blue peak (p=0.001265; t-test).")
 p3+labs(title = "Gestational age acceleration is significantly deviated from 0 in aspirin-treated samples (Anova, p=6.7e-05; t-test, Bonferroni-corrected, p= 0.0083).")
 
-=======
+
 # #residual plot
 # model<-lm(Predicted~Actual,data=df[df$group!="2nd trimester, aspirin-treated",])
 # require(Metrics)
@@ -862,7 +846,7 @@ p3+labs(title = "Gestational age acceleration is significantly deviated from 0 i
 p1
 p2
 # p3
->>>>>>> 617d471d8ce35d0fd1606f022b7161eb41c8b716
+
 ```
 
 # Combined effects of aspirin treatment on preeclampsia prevention and the gestational age advancement
@@ -877,7 +861,7 @@ We next examined the specific metabolites that were (1) affected by aspirin trea
 ```{r get-PE-mets-from-ASA2,echo=FALSE,warning=FALSE,message=FALSE,fig.width=8, fig.height=8}
 rm(list=ls())
 dir.output="CombinedEffect"
-<<<<<<< HEAD
+
 require(ggpubr)
 require(reshape2)
 # invisible(mkdirs(dir.output))
@@ -1107,12 +1091,10 @@ p +labs(title = "Effects of aspirin on preeclampsia prevention. Error-bar chart 
 rm(list=ls())
 dir.output="CombinedEffect"
 # invisible(mkdirs(dir.output))
-=======
-# invisible(mkdirs(dir.output))
-require(ropls)
->>>>>>> 617d471d8ce35d0fd1606f022b7161eb41c8b716
 require(R.utils)
 require(reshape2)
+require(repmis)
+require(devtools)
 
 invisible(source_data("https://github.com/BRL-BCM/ASPRE-analysis/raw/main/data/dataSet.RData?raw=True"))
 source_url("https://github.com/BRL-BCM/ASPRE-analysis/raw/main/R/func.R")
@@ -1449,7 +1431,7 @@ p9=ggplot(
   xlab("Significance of internal exposure (bits)") +
   ylab("Significance of compound (bits)")
 
-p9 + labs(title = "Significance of individual metabolite in mediating intervention outcome compared to internal exposure, measured by information loss caused at the removal of the variable. When distributed on the right of line y=x, removal of internal exposure costs higher information loss than removal of the compound.")
+p9 + labs(title = "Significance of individual metabolite in mediating intervention outcome compared to internal exposure, measured by information loss caused at the removal of the variable. When distributed on the right of line y=x, removal of internal exposure costs higher information loss than removal of the compound.") +theme(text = element_text(size = 10))
 
 # pdf(file="allmetsASAASAres.pdf",height = 6,width = 5)
 # p
@@ -1490,6 +1472,6 @@ p9 + labs(title = "Significance of individual metabolite in mediating interventi
 Over one-third (26/73) of these differential metabolites were altered by aspirin, including aspirin’s derivative metabolites salicylate and 4-hydroxyhippurate. Lipids (8/26) and steroids (6/26) occupied more than half of the list, reinforcing their association with pregnancy outcome and response to aspirin treatment. **Figure 4C**
 
 ```{r ASA-PREG-PE-2, nclude=TRUE,message=FALSE,warning=FALSE,fig.width=8,fig.height=8}
-p10 + labs(title = "Metabolites (n=625) under the impact of aspirin, pregnancy and their associations with preeclampsia prevention. Correlation with aspirin intake and gestation advancement is measured by variable importance on projection (VIP) in first-pass compliance prediction model and gestational age prediction model, respectively. Direction of correlation is indicated by positive/negative VIP value for impact of aspirin and color of the dot for gestational age. Metabolites with VIP>1 in prediction of gestational age are colored in red/blue if positively/negatively correlated with gestational age. Horizontal dashed line, p=0.05; Vertical dashed lines, |VIP|=1. Labeled compounds are 1) associated with aspirin intake (|VIP|>1) and 2) predictive of prevention outcome (p<0.05). Within labeled compounds, those changed in opposite direction over aspirin administration and gestation advancement are underlined and in black.")
+p10 + labs(title = "Metabolites under the impact of aspirin, pregnancy and their associations with preeclampsia prevention.") +theme(text = element_text(size = 10))
 
 ```
