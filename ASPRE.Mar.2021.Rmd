@@ -21,13 +21,20 @@ editor_options:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+<<<<<<< HEAD
+knitr::opts_knit$set(root.dir = "/Volumes/Seagate-2C/BaylorMHG/PE_ASA/ASPRE-analysis/data")
+
+setwd("/Volumes/Seagate-2C/BaylorMHG/PE_ASA/ASPRE-analysis/data")
+load(file = "/Volumes/Seagate-2C/BaylorMHG/PE_ASA/ASPRE-analysis/data/dataSet.RData")
+=======
 knitr::opts_knit$set(root.dir = "/Volumes/Seagate-2C/BaylorMHG/PE_ASA/ASPRE-analysis/docs")
 
 setwd("/Volumes/Seagate-2C/BaylorMHG/PE_ASA/ASPRE-analysis/docs")
 # load(file = "/Volumes/Seagate-2C/BaylorMHG/PE_ASA/GitHub.Mar.2021/dataSet.RData")
+>>>>>>> 617d471d8ce35d0fd1606f022b7161eb41c8b716
 # dataset=dataset[c("data_zscore","data_raw")]
-# sampleAttr=sampleAttr[,c("sIDs","ga.w","ptIDs","ASA","pt_compliance",Compliance....,"pe","trimester","ASA_tri","ASA_tri_chr","pe.risk","consss_batch")]
-# save(compAnno,dataset,sampleAttr,file="/Volumes/Seagate-2C/BaylorMHG/PE_ASA/GitHub.Mar.2021/dataSet.RData")
+# sampleAttr=sampleAttr[,c("sIDs","ga.w","ptIDs","ASA","pt_compliance","Compliance....","pe","trimester","tri_pe","ASA_tri","ASA_tri_chr","pe.risk","consss_batch")]
+# save(compAnno,dataset,sampleAttr,file="/Volumes/Seagate-2C/BaylorMHG/PE_ASA/ASPRE-analysis/data/dataSet.RData")
 ```
 
 ## Data Quality Control
@@ -344,7 +351,9 @@ if (nrow(MOF.df)!=0){
 df
 dir.output="aspirin.UVA"
 invisible(mkdirs(dir.output))
-write.xlsx(MOF.df,file=sprintf("%s/Table.UVA.xlsx",dir.output))
+# df.vol=metReport$volcano.ASA_tri.df
+# save(df.vol,file=sprintf("%s/FourGroup.ttest.RData",dir.output))
+# write.xlsx(MOF.df,file=sprintf("%s/Table.UVA.xlsx",dir.output))
 ```
 
 ## Multivariate analysis (MVA)
@@ -559,10 +568,13 @@ The current study included variability in reported compliance and variability in
 
 1. Within the aspirin treated group, participants who developed preeclampsia tended to be less compliant than participants without preeclampsia; However the predicted compliance, a measure of internal exposure to aspirin, showed stronger association  - **Figure 2A,B**
 2. To investigate whether the reported compliance, the level of internal aspirin exposure or both were predictive of preeclampsia, logistic regression was conducted on reported compliance, predicted compliance and both variables in combination. We then compare these  models using Akaike information criterion (AIC). - **Figure 2C**.
-```{r Aspirin-internalExposure-PE, include=TRUE,message=FALSE,warning=FALSE,fig.show="hold", out.width="50%"}
+
+```{r Aspirin-internalExposure-PE, include=TRUE,message=FALSE,warning=FALSE}
 rm(list=ls())
 require(ropls)
 require(R.utils)
+require(repmis)
+require(devtools)
 
 invisible(source_data("https://github.com/BRL-BCM/ASPRE-analysis/raw/main/data/dataSet.RData?raw=True"))
 source_url("https://github.com/BRL-BCM/ASPRE-analysis/raw/main/R/func.R")
@@ -593,7 +605,7 @@ if(TrainSet=="tri2"){
 }
 data_mx=t(data_mx)
 
-require(caret)
+# require(caret)
 # folds <- createFolds(1:dim(sampleAttr)[1], k =20,  list = TRUE, returnTrain = FALSE)
 # oplsda.cv=list()
 # for (i in names(folds)){
@@ -614,12 +626,13 @@ require(caret)
 rmse=RMSE(Ypred.cv,Yactual)
 knitr::kable(data.frame(`Cross Validation 20-fold `=sprintf("RMSE: %.3f",rmse)))
 
-df=data.frame(sampleID=names(Ypred.cv),Actual=Yactual,Predicted=Ypred.cv,Subset="train",group=sampleAttr$ASA)
+df=data.frame(sampleID=names(Ypred.cv),Actual=Yactual,Predicted=Ypred.cv,Subset="test",group=sampleAttr$ASA)
 # df$group=paste0(sampleAttr$ASA_tri_chr,sep=" PE",as.factor(sampleAttr$pe))
 df$group=paste0(ifelse(sampleAttr$ASA,"aspirin-treated","placebo-treated"),sep=", ",ifelse(sampleAttr$pe,"preeclamptic","non-preeclamptic"))
 df$group=as.character(df$group)
 df$group=gsub("ASA","aspirin",df$group)
 df$group=gsub("PLACEBO","placebo",df$group)
+save(df,file=sprintf("%s/InternalExposure-20CV.RData",dir.output))
 # draw plot
 p=ggplot(df, aes_string(x = "Predicted", y = "Actual",col="group",label="sampleID")) +
   geom_point()
@@ -649,8 +662,8 @@ p2=p
 # ggsave(p,filename = sprintf("%s/Aspirin.ReportedVsPredictedCompliance.PE.pdf",dir.output),height = 4,width = 4,device = cairo_pdf)
 # ggsave(p,filename = sprintf("%s/Aspirin.ReportedVsPredictedCompliance.PE.svg",dir.output),height = 4,width = 4,device = svglite)
 
-p1
-p2
+p1+labs(title = "Reported compliance plotted against internal exposure. Internal exposure is calculated as leave-2-out OPLS-DA model predicted compliance.")
+p2+labs(title = "Distribution of reported compliance and internal exposure in aspirin-treated women with (n=10) and without (n=10) preeclampsia.")
 
 require(pROC)
 Ypred.cv=ifelse(Ypred.cv<50,"0","1")
@@ -680,13 +693,17 @@ AIC.df=data.frame(Model=c("Reported Compliance","Predicted compliance","Reported
            AICc=c(AICc(glm.reportedCompliance),AICc(glm.predictedCompliance),AICc(glm.combinedCompliance))
            )
 require(openxlsx)
-knitr::kable(AIC.df)
-write.xlsx(AIC.df,file = sprintf("%s/ASA2.AIC.predCompliance2PE.xlsx",dir.output),rowNames=T)
+knitr::kable(AIC.df, caption = "Fig 3. Akaike information criteria (AIC) for the fitted logistic regression models. K, number of parameters; AUC, area under the ROC Curve; AICc, Akaike information criterion with correction for small sample size.")
+# write.xlsx(AIC.df,file = sprintf("%s/ASA2.AIC.predCompliance2PE.xlsx",dir.output),rowNames=T)
 ```
 
 # Aspirin treatment slows down the metabolic clock of gestation
 
-```{r PREG-MVA, include=TRUE,message=FALSE,warning=FALSE,fig.show="hold", out.width="33%"}
+1. A metabolic clock of gestation was constructed as an OPLS-DA model that predicts gestational age. The model was constructed from metabolomic data of the pre-treatment (aspirin-1st and placebo-1st) and the placebo-treated (placebo-2nd) samples. The predictive accuracy of the model Mean Absolute Error (MAE) of 0.94 (weeks) and the actual-by-predicted linear regression r2 of 0.934 indicated highly accurate prediction of gestational age **Figure 3A**. 
+2. We next applied the OPLS-DA model to predict gestational age in the aspirin-treated group.The predicted gestational age in the aspirin-treated group was significantly lower than the predicted gestational age in the placebo-treated group **Figure 3B**. 
+3. The extent of delay of the metabolic clock caused by aspirin was quantified by “gestational age acceleration” - the raw residual after regressing the metabolic gestational age estimate on observed gestational age **Figure 3C** . In the aspirin-treated group, gestational age acceleration significantly deviated from zero in a negative direction by 1.27 week on average.
+
+```{r PREG-MVA, include=TRUE,message=FALSE,warning=FALSE}
 rm(list=ls())
 dir.output="PREG.MVA"
 # invisible(mkdirs(dir.output))
@@ -739,12 +756,21 @@ target=sampleAttr$ga.w
 names(target)=sampleAttr$sIDs
 train.ind=which(!sampleAttr$ASA | sampleAttr$trimester=="1")
 # oplsda=opls(data_mx, target,predI = 1, orthoI = NA, subset=train.ind, plotL=FALSE)
-# save(oplsda,file=sprintf("%s/PREG.oplsda.ga-w.train.tri1_and_placebo2.RData",dir.output))
 
 load(sprintf("%s/PREG.oplsda.ga-w.train.tri1_and_placebo2.RData",dir.output))
+VIP=oplsda@vipVn
+VIP=VIP[order(VIP,decreasing = T)]
+VIP.df=data.frame(Subpathway=compAnno$SUB_PATHWAY[match(names(VIP),compAnno$COMP_ID)],
+                  BIOCHEMICAL=compAnno$BIOCHEMICAL[match(names(VIP),compAnno$COMP_ID)],
+                  Direction=ifelse(oplsda@loadingMN[match(names(VIP),rownames(oplsda@loadingMN)),]>0,"Up","Down"),
+                  VIP=VIP,
+                  Xloadings=oplsda@loadingMN[match(names(VIP),rownames(oplsda@loadingMN)),]
+                  )
+# save(oplsda,VIP,VIP.df,file=sprintf("%s/PREG.oplsda.ga-w.train.tri1_and_placebo2.RData",dir.output))
+
 
 #----Model performance: Goodness of fit table----
-knitr::kable(oplsda@summaryDF)
+knitr::kable(oplsda@summaryDF,caption = "Performance of GA prediction model (metabolic clock)")
 
 #----plot predicted-actual with both training and testing----
 predictedY=rep(NA,length(sampleAttr$sIDs))
@@ -785,6 +811,33 @@ p2=p
 # ggsave(p,filename = sprintf("%s/PREG.PredictedGAdensity.pdf",dir.output),height = 4,width = 4,device = cairo_pdf)
 # ggsave(p,filename = sprintf("%s/PREG.PredictedGAdensity.svg",dir.output),height = 4,width = 4,device = svglite)
 
+<<<<<<< HEAD
+#residual plot
+model<-lm(Predicted~Actual,data=df[df$group!="2nd trimester, aspirin-treated",])
+require(Metrics)
+knitr::kable(data.frame(MAE=mae(df$Actual[df$group!="2nd trimester, aspirin-treated"],df$Predicted[df$group!="2nd trimester, aspirin-treated"]),
+                        `R-squre`=(summary(model))$adj.r.squared))
+resd=df$Predicted-stats::predict(model,newdata=df)
+names(resd)=df$sampleID
+df$lm.resd=resd
+require(ggpubr)
+knitr::kable(df %>% group_by(group) %>% summarise(mean=mean(lm.resd)))
+stat.mean=compare_means(lm.resd ~ group,  data = df,
+              ref.group = ".all.", method = "t.test",p.adjust.method = "bonferroni") %>% rstatix::add_significance("p.adj")
+df$group=factor(df$group,levels = c("1st trimester, pre-treatment","2nd trimester, aspirin-treated","2nd trimester, placebo-treated"))
+p = ggboxplot(df, x = "group", y = "resd",col="group",add = "jitter") + #rotate_x_text(angle = 90) +
+  stat_compare_means(method = "anova", label.y = 6) +        # Add global annova p-value
+  stat_pvalue_manual(stat.mean,label = "p.adj.signif",x="group2",y.position = 5)+
+  ylab("residual GA (weeks)") + xlab("") + theme(axis.text.x = element_blank(),legend.title = element_blank(), legend.direction = "vertical")
+p3=p
+# ggsave(p,filename = sprintf("%s/PREG.ResidualGA.pdf",dir.output),height = 4,width = 4,device = cairo_pdf)
+# ggsave(p,filename = sprintf("%s/PREG.ResidualGA.svg",dir.output),height = 4,width = 4,device = svglite)
+# save(df,file=sprintf("%s/PREG.actual_pred_resd.RData",dir.output))
+p1+labs(title = "Gestational age estimation by metabolic clock trained on samples from women not treated by aspirin accurately reflects progression at early- and mid-pregnancy.")
+p2+labs(title = "Aspirin-treated samples were estimated to have a younger gestational age then placebo-treated samples, depicted by the left-shift of green peak from blue peak (p=0.001265; t-test).")
+p3+labs(title = "Gestational age acceleration is significantly deviated from 0 in aspirin-treated samples (Anova, p=6.7e-05; t-test, Bonferroni-corrected, p= 0.0083).")
+
+=======
 # #residual plot
 # model<-lm(Predicted~Actual,data=df[df$group!="2nd trimester, aspirin-treated",])
 # require(Metrics)
@@ -809,16 +862,255 @@ p2=p
 p1
 p2
 # p3
+>>>>>>> 617d471d8ce35d0fd1606f022b7161eb41c8b716
 ```
 
 # Combined effects of aspirin treatment on preeclampsia prevention and the gestational age advancement
+We next examined the specific metabolites that were (1) affected by aspirin treatment, and (2) predictive of clinical response to aspirin treatment; and (3) correlated with gestational age. 
 
-```{r ASA-PREG-PE, include=TRUE,message=FALSE,warning=FALSE}
+## Differential metabolites in aspirin treatment response (PE 0 or 1)
 
+1. Comparing preeclamptic or non-preeclamptic clinical outcomes in response to treatment, we identified 73 significantly different metabolites (t-test, p <0.05) **Table S5**. 
+2. Preeclamptic samples was dominated by higher levels of steroids, long-chain fatty acids (LCFAs), very long-chain fatty-acids (VLCFAs) and lipids containing LCFA or VLCFA branches **Figure 4A**
+3. in the set of differential metabolites in responsive/unresponsive condition, pairwise AIC comparison identified 16a-hydroxy DHEA 3-sulfate (HMDB0062544) and trimethylamine N-oxide (HMDB0000925) as stronger mediators of preeclampsia outcome than internal exposure signal, outperforming by 2.17 bits and 0.015 bits respectively **Figure 4B**
+
+```{r get-PE-mets-from-ASA2,echo=FALSE,warning=FALSE,message=FALSE,fig.width=8, fig.height=8}
+rm(list=ls())
+dir.output="CombinedEffect"
+<<<<<<< HEAD
+require(ggpubr)
+require(reshape2)
+# invisible(mkdirs(dir.output))
+invisible(source_data("https://github.com/BRL-BCM/ASPRE-analysis/raw/main/data/dataSet.RData?raw=True"))
+source_url("https://github.com/BRL-BCM/ASPRE-analysis/raw/main/R/func.R")
+
+#---- get full data_mx with outliers excluded ----
+outliers=c(sampleAttr$sIDs[sampleAttr$consss_batch!="non-outlier"])
+input=list(rmX="Yes",level="zscore",fillThreshold=0.2,DiffThr=0.5,
+           batchEffectCorrectMethod="none",
+          tri2only=FALSE,sampleFeature="ASA_tri_chr",
+           ASA2outliersBoxplot="Include all ASA 2nd trimester samples",measureBoxplot="mean",
+           ImputeMissingValues=TRUE,selectMets=c("glucose","heme"),
+           outliers=outliers)
+temp=PEASA.getDataMxByInput(input)
+metReport=list(data_mx=temp$data_mx,sampleAttr=temp$sampleAttr,input=input)
+rm(list=setdiff(ls(),c(lsf.str(),"metReport","compAnno","dir.output")))
+
+#-----by t.test----
+data_mx=metReport$data_mx
+sampleAttr=metReport$sampleAttr
+
+temp=paste("trimester",sampleAttr$trimester,sep = "")
+temp2=paste("PE",sampleAttr$pe,sep = "")
+sampleAttr$tri_pe=paste(temp,temp2,sep = "_")
+usePLACEBOonly=FALSE
+usePLACEBO2only=FALSE
+useASAtri2only=T
+noASAtri2=FALSE
+
+if(usePLACEBOonly){
+  sampleAttr$tri_pe=replace(sampleAttr$tri_pe,sampleAttr$tri_pe=="trimester2_PE0"&sampleAttr$ASA,"trimester2_ASA_PE0")
+  sampleAttr$tri_pe=replace(sampleAttr$tri_pe,sampleAttr$tri_pe=="trimester2_PE1"&sampleAttr$ASA,"trimester2_ASA_PE1")
+  sampleAttr$tri_pe=replace(sampleAttr$tri_pe,sampleAttr$tri_pe=="trimester1_PE0"&sampleAttr$ASA,"trimester1_ASA_PE0")
+  sampleAttr$tri_pe=replace(sampleAttr$tri_pe,sampleAttr$tri_pe=="trimester1_PE1"&sampleAttr$ASA,"trimester1_ASA_PE1")
+}
+if(noASAtri2){
+  sampleAttr$tri_pe=replace(sampleAttr$tri_pe,sampleAttr$tri_pe=="trimester2_PE0"&sampleAttr$ASA,"trimester2_ASA_PE0")
+  sampleAttr$tri_pe=replace(sampleAttr$tri_pe,sampleAttr$tri_pe=="trimester2_PE1"&sampleAttr$ASA,"trimester2_ASA_PE1")
+}
+if(useASAtri2only){
+  sampleAttr$tri_pe=replace(sampleAttr$tri_pe,sampleAttr$tri_pe=="trimester2_PE0"&!sampleAttr$ASA,"trimester2_PLACEBO_PE0")
+  sampleAttr$tri_pe=replace(sampleAttr$tri_pe,sampleAttr$tri_pe=="trimester2_PE1"&!sampleAttr$ASA,"trimester2_PLACEBO_PE1")
+  sampleAttr$tri_pe=replace(sampleAttr$tri_pe,sampleAttr$trimester=="1","trimester1")
+}
+if(usePLACEBO2only){
+  sampleAttr$tri_pe=replace(sampleAttr$tri_pe,sampleAttr$tri_pe=="trimester2_PE0"&sampleAttr$ASA,"trimester2_ASA_PE0")
+  sampleAttr$tri_pe=replace(sampleAttr$tri_pe,sampleAttr$tri_pe=="trimester2_PE1"&sampleAttr$ASA,"trimester2_ASA_PE1")
+  sampleAttr$tri_pe=replace(sampleAttr$tri_pe,sampleAttr$trimester=="1","trimester1")
+}
+
+# check if gestational time differs significantly: No
+# df=sampleAttr[sampleAttr$tri_pe %in% c("trimester2_PE0","trimester2_PE1"),c("sIDs","pe","ga.w")]
+# colnames(df)=c("sampleID","PE","GA (weeks)")
+# 
+# p = ggdotplot(df, x = "PE", y = "GA (weeks)",color = "PE", fill="PE", add = "mean_sd",
+#               #facet.by="type",
+#               palette = "npg")+
+#   # stat_pvalue_manual(stat.test, label ="{p.adj}{p.adj.signif}", tip.length = 0.01) +
+#   stat_compare_means( label = "p", label.x = 1.5) +
+#   theme(axis.text.x=element_blank())
+# p
+
+group=list()
+for ( i in sort(unique(sampleAttr$tri_pe))){
+  group[[i]]=sampleAttr$sIDs[sampleAttr$tri_pe==i]
+}
+
+my_comparison=list(
+  c("trimester1_PE0", "trimester1_PE1"),
+  c("trimester2_PE0","trimester2_PE1")
+)
+
+p.result=perform_all_t_tests.pair_wise(data_mx,group = group, p.adjust.method = "none", paired=FALSE, my_comparison = my_comparison,p.adjust.method2 = "none")
+yTh=-log10(0.05)
+temp = data.frame(matrix(ncol = 7))
+colnames(temp)=c("x","y","direction","pair","group1","group2","BIOCHEMICAL")
+for (n in 1:length(p.result$comparison_pairs)){
+  df.vol = data.frame(cbind(x=p.result$meanDiff[,n],y=-log10(p.result$p.adj2[,n])))
+  df.vol$direction = rep ("Not Significant",nrow(df.vol))
+  for ( r in 1:nrow(df.vol)){
+    if (is.na(df.vol$y[r])){
+      df.vol$direction[r] = NA
+    }else{
+      if (df.vol$y[r] > yTh){
+        if (df.vol$x[r] <=0){
+          df.vol$direction[r] = "Down"
+        }else{
+          df.vol$direction[r] = "Up"
+        }
+      }
+    }
+  }
+  df.vol$pair=paste0(p.result$comparison_pairs[[n]],collapse = "&")
+  df.vol$group1=sprintf("base:%s",gsub("_"," ",p.result$comparison_pairs[[n]][1]))
+  df.vol$group2=sprintf("exprimental:%s",gsub("_"," ",p.result$comparison_pairs[[n]][2]))
+  df.vol$BIOCHEMICAL=compAnno$BIOCHEMICAL[match(rownames(data_mx),compAnno$COMP_ID)]
+  temp=rbind(temp,df.vol)
+}
+df.vol=temp[-1,]
+
+if(useASAtri2only|usePLACEBO2only){
+  df.vol=df.vol[df.vol$pair!="trimester1_PE0&trimester1_PE1",]
+}
+# save(df.vol,file=sprintf("%s/PE.ttest.tri2.RData",dir.output))
+
+#----draw volcano plots : not hown in html----
+dotsize = 2
+axistextsize = 10
+legendtextsize = 10
+textlablesize = 0
+
+myColors <- c("grey","blue","red")
+names(myColors) <- c("Not Significant","Down","Up")
+colScale <- scale_colour_manual(name = " ",values = myColors)
+p = ggplot(data = df.vol, aes(x = x, y = y, label=BIOCHEMICAL)) +
+  facet_wrap(~ group1+group2) +
+  geom_point(aes(colour = direction),size = dotsize) +
+  xlab("z-score difference") +
+  ylab("-log10(P value)") +
+  # theme_bw() +
+  theme(#panel.grid.major = element_blank(),
+    #panel.grid.minor = element_blank(),
+    axis.text.y = element_text(size = axistextsize
+                               # colour = "black"
+    ),
+    axis.text.x = element_text(size = axistextsize
+                               # colour = "black"
+    ),
+    axis.title.x = element_text(size = axistextsize),
+    axis.title.y = element_text(size = axistextsize),
+    legend.title = element_text(size = 0),
+    legend.text = element_text(size = legendtextsize)) +
+  colScale +
+  geom_text(vjust = "inward", hjust = "inward", size = textlablesize)
+
+ply=ggplotly(p)
+
+if(useASAtri2only|usePLACEBO2only){
+  ply$x$data[[4]]$text=""
+}else{
+ply$x$data[[8]]$text=""
+ply$x$data[[7]]$text=""
+  }
+
+if(useASAtri2only|usePLACEBO2only){
+  strr=c("useASAtri2only","usePLACEBO2only")[c(useASAtri2only,usePLACEBO2only)]
+  metReport[[paste0('PE.',strr,"volcanoPlot")]]=ply
+  metReport[[paste0('PE.',strr,"volcanoDf")]]=df.vol
+}else{
+  metReport[['PE.volcanoPlot']]=ply
+  metReport[['PE.volcanoDf']]=df.vol
+}
+
+#----Table differential met in response----
+ASAPE.BIOCHEMICAL=df.vol[df.vol$direction!="Not Significant",c("x","y","direction","BIOCHEMICAL")]
+colnames(ASAPE.BIOCHEMICAL)=c("delta-z","-log(p)","direction","BIOCHEMICAL")
+ASAPE.BIOCHEMICAL$p=10^(-ASAPE.BIOCHEMICAL$`-log(p)`)
+ASAPE.BIOCHEMICAL$HMDB_ID=compAnno$HMDB_ID[match(ASAPE.BIOCHEMICAL$BIOCHEMICAL,compAnno$BIOCHEMICAL)]
+ASAPE.BIOCHEMICAL$KEGG=compAnno$KEGG[match(ASAPE.BIOCHEMICAL$BIOCHEMICAL,compAnno$BIOCHEMICAL)]
+ASAPE.BIOCHEMICAL$SUB_PATHWAY=compAnno$SUB_PATHWAY[match(ASAPE.BIOCHEMICAL$BIOCHEMICAL,compAnno$BIOCHEMICAL)]
+
+if (nrow(ASAPE.BIOCHEMICAL)!=0){
+  df = datatable(ASAPE.BIOCHEMICAL[order(ASAPE.BIOCHEMICAL$SUB_PATHWAY),c("SUB_PATHWAY","BIOCHEMICAL","delta-z","-log(p)","HMDB_ID")],
+                 rownames = FALSE,
+                 caption = 'Table S5. List of differential metabolites between participants with preeclampsia (n=10) and without preeclampsia (n=10) after aspirin intervention.Direction of change and calculation of ∆ z-score is based on comparing participants with preeclampsia against those without preeclampsia. Metabolites are grouped by sub-pathways.',
+                 options = list(scrollX = TRUE,fixedColumns = TRUE, #dom = 't',
+                                pageLength = 10,
+                                lengthMenu = c(10, 20, 50))) %>%
+    formatStyle(columns = colnames(.), fontSize = '50%') %>%
+    formatRound(columns=c("delta-z", "-log(p)"), digits=3)
+}else{
+  df = datatable(data.frame(messgae=c("Metaboloites with different missing rate between ASA and PLACEBO group not found.")),options = list(dom = 't'))
+  # print("Metaboloites with different missing rate between ASA and PLACEBO group not found.")
+}
+
+df
+
+# require(openxlsx)
+# write.xlsx(ASAPE.BIOCHEMICAL,file=sprintf("%s/ASAPE.HMBD.$s.%s.xlsx",dir.output,dim(sampleAttr)[1],c("PLACEBO2only","ASAtri2only")[c(usePLACEBO2only,useASAtri2only)]))
+
+# how many steroids
+# table(grep("Steroids",compAnno$SUB_PATHWAY[compAnno$COMP_ID %in% rownames(data_mx)],value = T))
+
+# show dominant class of molecules
+# temp=table(ASAPE.BIOCHEMICAL$SUB_PATHWAY)
+# temp=temp[temp>1]
+# temp[order(temp,decreasing = T)]
+
+# ---- draw lineplot errorbarplot ----
+ASAPE.BIOCHEMICAL$COMP_ID=compAnno$COMP_ID[match(ASAPE.BIOCHEMICAL$BIOCHEMICAL,compAnno$BIOCHEMICAL)]
+data_mx=(metReport$data_mx)[ASAPE.BIOCHEMICAL$COMP_ID,sampleAttr$sIDs[paste(sampleAttr$trimester,"_",sampleAttr$pe,sep = "") %in% c("2_0","2_1")]]
+df=melt(t(data_mx),value.name = "zscore",varnames = c("sampleID","CompoundID"))
+df$BIOCHEMICAL=compAnno$BIOCHEMICAL[match(df$CompoundID,compAnno$COMP_ID)]
+df$Subpathway=compAnno$SUB_PATHWAY[match(df$CompoundID,compAnno$COMP_ID)]
+df$PE=as.character(sampleAttr$pe[match(df$sampleID,sampleAttr$sIDs)])
+subpathways2plot=c("Sterol","Pregnenolone Steroids",
+                   "Androgenic Steroids",
+                   "Phosphatidylcholine (PC)",
+                   "Phosphatidylinositol (PI)",
+                   "Phosphatidylethanolamine (PE)",
+                   "Plasmalogen ->  Phospholipid",
+                   "Lysophospholipid",
+                   "Lysoplasmalogen",
+                   "Fatty Acid, Dicarboxylate",
+                   "Diacylglycerol")
+mets=ASAPE.BIOCHEMICAL$BIOCHEMICAL[ASAPE.BIOCHEMICAL$SUB_PATHWAY %in% subpathways2plot]
+df=df[df$CompoundID %in% compAnno$COMP_ID[match(mets,compAnno$BIOCHEMICAL)],]
+df$SubGroup=df$Subpathway
+df$SubGroup[!df$SubGroup %in% subpathways2plot]=NA
+
+df.long=df
+df$SubGroup=factor(df$SubGroup,levels = subpathways2plot)
+df=df[order(df$SubGroup),]
+df= df %>% as.data.frame()
+df$PE=factor(df$PE,levels = c(1,0))
+p = ggerrorplot(df, x = "BIOCHEMICAL", y = "zscore",color = "PE", fill="PE", add = "mean_sd",
+                 rotate=TRUE,
+                palette = "npg")+
+    # stat_pvalue_manual(stat.test, label ="{p.adj}{p.adj.signif}", tip.length = 0.01) +
+    stat_compare_means( label = "p", label.x = 1) 
+p +labs(title = "Effects of aspirin on preeclampsia prevention. Error-bar chart of significantly different lipids, fatty acids and steroids in aspirin-treated participants. Dots and error-bars represent means of z-scores and standard deviation in preeclamptic samples (red, n=10) and non-preeclamptic samples (blue, n=10).")
+
+```
+
+```{r ASA-PREG-PE-1, include=TRUE,message=FALSE,warning=FALSE,fig.width=8,fig.height=8}
 rm(list=ls())
 dir.output="CombinedEffect"
 # invisible(mkdirs(dir.output))
+=======
+# invisible(mkdirs(dir.output))
 require(ropls)
+>>>>>>> 617d471d8ce35d0fd1606f022b7161eb41c8b716
 require(R.utils)
 require(reshape2)
 
@@ -837,70 +1129,367 @@ temp=PEASA.getDataMxByInput(input)
 metReport=list(data_mx=temp$data_mx,sampleAttr=temp$sampleAttr,input=input)
 rm(list=setdiff(ls(),c(lsf.str(),"metReport","compAnno")))
 
-#---- make model for train-only to get permutation plot ----
+#---- prepare objects: data_mx, InternalExposure VIP of ASA.mets and PREG.mets ----
 dir.output="CombinedEffect"
 data_mx=metReport$data_mx
 sampleAttr=metReport$sampleAttr
 require(R.utils)
 require(openxlsx)
-temp=loadToEnv("/Volumes/Seagate-2C/BaylorMHG/PE_ASA/1st_052820/MVA_none_144/internalexposure.RData")[["df"]]
+
+# load Internal Exposure (IE)
+temp=loadToEnv("aspirin.MVA/InternalExposure-20CV.RData")[["df"]]
 InternalExposure=temp$Predicted
 names(InternalExposure)=temp$sampleID
 
-
-temp=loadToEnv("/Volumes/Seagate-2C/BaylorMHG/PE_ASA/1st_052820/MVA_none_144/PREG.actual_pred_resd.RData")[["df"]]
+# load GA residual (acceleration) based on gastiational age clock 
+temp=loadToEnv(sprintf("PREG.MVA/PREG.actual_pred_resd.RData"))[["df"]]
 GA.resd=temp$lm.resd
 names(GA.resd)=temp$sampleID
 #test model correlation
 tmp=temp[sampleAttr$ASA_tri!="TRUE2",]
-cor.test(tmp$Actual,tmp$Predicted)
+# cor.test(tmp$Actual,tmp$Predicted)
 
+sampleAttr=sampleAttr[sampleAttr$trimester=="2"&sampleAttr$ASA,]
+sample.ind=sampleAttr$sIDs
+data_mx=data_mx[,sample.ind]
+data_mx=imputeMissingValues(data_mx,data_mx)
+InternalExposure=InternalExposure[sample.ind]
+GA.resd=GA.resd[sample.ind]
+
+# load molecule property re: ASA in PE 0/1 molucules
+# ASA.res.met=read.xlsx("/Volumes/Seagate-2C/BaylorMHG/PE_ASA/1st_052820/UVA/ASA_PE_4group.xlsx",sheet = 1)
+ASA.res.met=loadToEnv(sprintf("CombinedEffect/PE.ttest.tri2.RData"))[["df.vol"]]
+# ASA.res.met=ASA.res.met[ASA.res.met$P.ASA_PE0.ASA_PE1<0.05,]
+# ASA.res.met=ASA.res.met[order(ASA.res.met$P.ASA_PE0.ASA_PE1),]
+ASA.res.met=ASA.res.met[order(ASA.res.met$y),]
+ASA.res.met.p=ASA.res.met$y
+names(ASA.res.met.p)=ASA.res.met$BIOCHEMICAL
+# ASA.res.met.meanDiff=read.xlsx("/Volumes/Seagate-2C/BaylorMHG/PE_ASA/1st_052820/UVA/ASA_PE_4group.xlsx",sheet = 4)
+ASA.res.met.meanDiff=ASA.res.met$x
+# ASA.res.met.meanDiff=ASA.res.met.meanDiff$MeanDiff.ASA_PE1.ASA_PE0[match(ASA.res.met$BIOCHEMICA,ASA.res.met.meanDiff$BIOCHEMICAL)]
+names(ASA.res.met.meanDiff)=ASA.res.met$BIOCHEMICAL
+ASA.res.met=compAnno$COMP_ID[match(ASA.res.met$BIOCHEMICAL,compAnno$BIOCHEMICAL)]
+
+# load VIPs in aspirin compliance prediction model
 TrainSet="tri2"
-# ASA.met=loadToEnv(sprintf("/Volumes/Seagate-2C/BaylorMHG/PE_ASA/1st_052820/MVA_none_144/ASA2.VIP.oplsda.compliance.train-only.%s.RData",TrainSet))[["VIP.df"]]
-# ASA.met=loadToEnv(sprintf("/Volumes/Seagate-2C/BaylorMHG/PE_ASA/1st_052820/MVA_none_144/ASA.VIP.oplsda.compliance.train-only.%s.RData",TrainSet))[["VIP.df"]]
-ASA.met=loadToEnv(sprintf("/Volumes/Seagate-2C/BaylorMHG/PE_ASA/1st_052820/MVA_none_144/ASA.VIPfrom0.oplsda.compliance.train-only.%s.RData",TrainSet))[["VIP.df"]]
-
-# ASA.met=loadToEnv(sprintf("/Volumes/Seagate-2C/BaylorMHG/PE_ASA/1st_052820/MVA_none_144/ASA2.VIPfom0.oplsda.compliance.train.%s.RData",TrainSet))[["VIP.df"]]
+ASA.met=loadToEnv(sprintf("aspirin.MVA/ASA.oplsda.compliance.train-only.%s.RData",TrainSet))[["VIP.df"]]
 ASA.met.VIP=ASA.met$VIP
 names(ASA.met.VIP)=ASA.met$BIOCHEMICAL
 ASA.met.xloadings=ASA.met$Xloadings
 names(ASA.met.xloadings)=ASA.met$BIOCHEMICAL
 ASA.met=rownames(ASA.met)
-ASA.meanDiff=loadToEnv("/Volumes/Seagate-2C/BaylorMHG/PE_ASA/1st_052820/UVA/ASA.ttest.none.144.RData")[["df.vol"]]
-                                                                                                       
-                                                                                                       
-ASA.res.met=read.xlsx("/Volumes/Seagate-2C/BaylorMHG/PE_ASA/1st_052820/UVA/ASA_PE_4group.xlsx",sheet = 1)
-# ASA.res.met=ASA.res.met[ASA.res.met$P.ASA_PE0.ASA_PE1<0.05,]
-ASA.res.met=ASA.res.met[order(ASA.res.met$P.ASA_PE0.ASA_PE1),]
-ASA.res.met.p=ASA.res.met$P.ASA_PE0.ASA_PE1
-names(ASA.res.met.p)=ASA.res.met$BIOCHEMICAL
-ASA.res.met.meanDiff=read.xlsx("/Volumes/Seagate-2C/BaylorMHG/PE_ASA/1st_052820/UVA/ASA_PE_4group.xlsx",sheet = 4)
-ASA.res.met.meanDiff=ASA.res.met.meanDiff$MeanDiff.ASA_PE1.ASA_PE0[match(ASA.res.met$BIOCHEMICA,ASA.res.met.meanDiff$BIOCHEMICAL)]
-names(ASA.res.met.meanDiff)=ASA.res.met$BIOCHEMICAL
-ASA.res.met=compAnno$COMP_ID[match(ASA.res.met$BIOCHEMICAL,compAnno$BIOCHEMICAL)]
+ASA.meanDiff=loadToEnv("aspirin.UVA/FourGroup.ttest.RData")[["df.vol"]]
+ASA.meanDiff=ASA.meanDiff[ASA.meanDiff$pair=="PLACEBO_-_2nd_Trimester&ASA_-_2nd_Trimester",]
 
-
-
-
-TrainSet="tri2"
-ASAonPREG.met=loadToEnv(file=sprintf("/Volumes/Seagate-2C/BaylorMHG/PE_ASA/1st_052820/MVA_none_144/ASAonPREG.loadings.df.ASA%s.RData",TrainSet))[["df"]]
-ASAonPREG.met=ASAonPREG.met[ASAonPREG.met$Col=="ASA impacted",]
-ASAonPREG.met=rownames(ASAonPREG.met)
-
-# PREG.met=loadToEnv(file="/Volumes/Seagate-2C/BaylorMHG/PE_ASA/1st_052820/MVA_none_144/PREG.VIP.oplsda.ga-w.train.tri1_and_placebo2.RData")[["VIP.df"]]
-PREG.met=loadToEnv(file="/Volumes/Seagate-2C/BaylorMHG/PE_ASA/1st_052820/MVA_none_144/PREG.VIPfom0.oplsda.ga-w.train.tri1_and_placebo2.RData")[["VIP.df"]]
+# load VIPs in gestational age prediction model
+PREG.met=loadToEnv("PREG.MVA/PREG.oplsda.ga-w.train.tri1_and_placebo2.RData")[["VIP.df"]]
 PREG.met.VIP=PREG.met$VIP
 names(PREG.met.VIP)=PREG.met$BIOCHEMICAL
 PREG.met.xloadings=PREG.met$Xloadings
 names(PREG.met.xloadings)=PREG.met$BIOCHEMICAL
 PREG.met=rownames(PREG.met)
-
-PREG.ttest=loadToEnv(file="/Volumes/Seagate-2C/BaylorMHG/PE_ASA/1st_052820/UVA/ASA_tri_4groups_ttest.144.none.RData")[["df.vol"]]
+PREG.ttest=loadToEnv("aspirin.UVA/FourGroup.ttest.RData")[["df.vol"]]
 PREG.ttest=PREG.ttest[PREG.ttest$pair=="PLACEBO_-_1st_Trimester&PLACEBO_-_2nd_Trimester",]
-# PREG.ttest[order(PREG.ttest$y),]
-length(unique(c(ASA.met,ASA.res.met,ASAonPREG.met)))
-rm(temp,TrainSet)
+
+# prep new data_mx with IE, GA residual and pe as variable
+require(ggcorrplot)
+ASA.met=ASA.met[!ASA.met%in%c("1868")]
+dm=data_mx[!rownames(data_mx) %in%c("1868"),sample.ind]
+rownames(dm)=compAnno$BIOCHEMICAL[match(rownames(dm),compAnno$COMP_ID)]
+dm=rbind(dm,InternalExposure)
+dm=rbind(dm,pe=sampleAttr$pe)
+dm=rbind(dm,GAresd=GA.resd)
+dm=t(dm)
+# corr <- cor(dm)
+# p.mat <- cor_pmat(dm)
+# save(corr,p.mat,file=sprintf("%s/corr_mx.RData",dir.output))
+load(sprintf("%s/corr_mx.RData",dir.output))
+target=c("InternalExposure","GAresd","pe")[1]
+temp=p.mat[,target]
+b=temp[temp<0.05]
+
+#---- AIC matrix -> AIC delta.matrix (compare to IE)----
+require(MuMIn)
+tem=unique(c(colnames(dm),"InternalExposure"))
+tem=tem[!tem %in% c("GAresd","pe")]
+tem.og=tem
+
+colnames(dm)=gsub("-","_",colnames(dm))
+colnames(dm)=gsub("^[0-9]+","e",colnames(dm))
+colnames(dm)=gsub("/","M",colnames(dm))
+colnames(dm)=gsub(" ","N",colnames(dm))
+colnames(dm)=gsub("\\(|\\)|\\:|\\,|\\[|\\]\\;","P",colnames(dm))
+colnames(dm)=gsub("[[:punct:]]","P",colnames(dm))
+
+tem=gsub("-","_",tem)
+tem=gsub("^[0-9]+","e",tem)
+tem=gsub("/","M",tem)
+tem=gsub(" ","N",tem)
+tem=gsub("\\(|\\)|\\:|\\,|\\[|\\]\\;","P",tem)
+tem=gsub("[[:punct:]]","P",tem)
+
+# AUC=list()
+# lm.coeffient=list()
+# AIC.mx=matrix(nrow = length(tem),ncol=length(tem))
+# target=c("InternalExposure","GAresd","pe")[3]
+# require(pROC)
+# for (i in 1:length(tem)) {
+#     formula=as.formula(paste0(target, " ~ ",tem[i]))
+#     model=glm(formula,as.data.frame(dm),family=binomial(link='logit'),)
+#     # model=glm(formula,as.data.frame(dm),family = gaussian)
+#     # AIC[[tem[i]]]=AICc(model)
+#     AIC.mx[i,i]=AICc(model)
+#     lm.coeffient[[i]]=model$coefficients
+#     prob=predict(model,type=c("response"))
+#     AUC[[i]]=pROC::auc(roc(response=dm[,target],predictor = prob))
+#     j=i+1
+#     while (j<=length(tem)) {
+#       formula=as.formula(paste0(target," ~ ",tem[i]," + ",tem[j]))
+#       model=glm(formula,as.data.frame(dm),family=binomial(link='logit'),)
+#       # model=glm(formula,as.data.frame(dm),family = gaussian)
+#       # AIC[[paste0(tem[i],"+",tem[j])]]=AICc(model)
+#       AIC.mx[i,j]=AICc(model)
+#       AIC.mx[j,i]=AICc(model)
+#       j=j+1
+#     }
+# }
+# names(AUC)=tem.og
+# names(lm.coeffient)=tem.og
+# # ogLik(model)
+# # AIC=unlist(AIC)
+# # AIC=AIC[order(AIC)]
+# dimnames(AIC.mx)=list(tem.og,tem.og)
+# save(AIC.mx,AUC,lm.coeffient,file=sprintf("%s/AIC.mx.%sVariable.RData",dir.output,(length(tem.og))))
+load(sprintf("%s/AIC.mx.%sVariable.RData",dir.output,(length(tem.og))))
+
+AIC.delta=matrix(nrow = length(tem),ncol=length(tem))
+for (i in 1:length(tem)) {
+  for (j in i:length(tem)){
+    AIC.delta[i,j]=AIC.mx[i,j]-AIC.mx[i,i]
+    AIC.delta[j,i]=AIC.mx[j,i]-AIC.mx[j,j]
+  }
+}
+dimnames(AIC.delta)=list(tem.og,tem.og)
+AIC.single.delta=matrix(nrow = length(tem),ncol=length(tem))
+for (i in 1:length(tem)) {
+  for (j in i:length(tem)){
+    AIC.single.delta[i,j]=AIC.delta[j,i]-AIC.delta[i,j]
+  }
+}
+dimnames(AIC.single.delta)=list(tem.og,tem.og)
+AIC.single.delta[lower.tri(AIC.single.delta)]=AIC.single.delta[upper.tri(AIC.single.delta)]
+temp=apply(AIC.single.delta,2,function(x) length(which(x<0)))
+# AIC.single.delta[rownames(AIC.single.delta)%in%names(temp[order(temp)][1:5]),rownames(AIC.single.delta)%in%names(temp[order(temp)][1:5])]
+
+#----plot----
+compareto="InternalExposure"
+AIC.delta=AIC.delta[!rownames(AIC.delta) %in% c("pe"),!rownames(AIC.delta) %in% c("pe")]
+
+CP2.bits=AIC.delta[compareto,]
+CP2.bits=CP2.bits[!names(CP2.bits)%in%c(compareto,"GAresd")]
+CP.bits=AIC.delta[,compareto]
+CP.bits=CP.bits[!names(CP.bits)%in%c(compareto,"GAresd")]
+# (CP.bits-CP2.bits)[order((CP.bits-CP2.bits),decreasing = T)]
+AIC.CombinedModel=AIC.mx[names(CP.bits),compareto]
+
+label=names(CP.bits)
+logp=ASA.meanDiff[match(names(CP.bits),ASA.meanDiff$BIOCHEMICAL),"y"]
+meanDiff=ASA.meanDiff[match(names(CP.bits),ASA.meanDiff$BIOCHEMICAL),"x"]
+AICpe=sapply(names(CP.bits),function(x) AIC.mx[x,x])
+cor2IE=abs(corr[compareto,names(CP.bits)])
+names(AUC)=tem.og
+AUCpe=unlist(AUC)[names(CP.bits)]
+lm.coeffient=unlist(lm.coeffient)
+names(lm.coeffient)=tem.og
+AUCpe.dir=AUCpe*ifelse(lm.coeffient[names(CP.bits)]>=0,-1,1)
+PREG.VIP.dir=PREG.met.VIP*ifelse(PREG.met.xloadings>=0,1,-1)
+ASA.VIP.dir=ASA.met.VIP*ifelse(ASA.met.xloadings>=0,1,-1)
+
+# check distribution
+# names(AUCpe)=tem.og[tem.og!=compareto]
+# plot(x=logp,y=AICpe)
+# plot(x=logp,y=AUCpe)
+# plot(x=AICpe,y=AUCpe)
+# plot(x=(unlist(lm.coeffient))[names(CP2.bits)],y=AUCpe)
+
+df=data.frame(`Internal Exposure`=CP2.bits,
+              Compound=CP.bits[names(CP2.bits)],
+              pair=names(CP2.bits),
+              Compound.sigcor=ifelse(names(CP2.bits) %in% names(b),"Correlated to Internal Exposure","Not Correlated to Internal Exposure"),
+              AIC.CombinedModel=AIC.CombinedModel,
+              label=label,
+              AIC=AICpe,
+              AUC=AUCpe,
+              lm.coeffient=(unlist(lm.coeffient))[names(CP2.bits)],
+              AUCpe.dir=AUCpe.dir[names(CP2.bits)],
+              ASAres.p=ASA.res.met.p[names(CP2.bits)],
+              ASAres.meanDiff=ASA.res.met.meanDiff[names(CP2.bits)],
+              `ASA.log10(p)`=logp,
+              ASA.meanDiff=meanDiff,
+              cor2IE=cor2IE,
+              PREG.loadings=PREG.met.xloadings[names(CP2.bits)],
+              PREG.VIP=PREG.met.VIP[names(CP2.bits)],
+              # PREG.dir.loadings=ifelse(PREG.met.xloadings[names(CP2.bits)]>0,"up","down"),
+              PREG.VIP.dir=PREG.VIP.dir[names(CP2.bits)],
+              Compliance.loadings=ASA.met.xloadings[names(CP.bits)],
+              Compliance.VIP.dir=ASA.VIP.dir[names(CP.bits)],
+              Compliance.VIP=ASA.met.VIP[names(CP.bits)]
+              )
+
+# check distribution
+# plot(x=df$Compliance.VIP,y=df$Compliance.loadings)
+# plot(x=df$PREG.VIP,y=df$PREG.loadings)
+# df$pair=as.character(df$pair)
+df$label=as.character(df$label)
+# plot_ly(x=df$ASAres.meanDiff,y=-log10(df$ASAres.p),mode="markers",text=~label,type = "scatter")
+
+# view ASAres volcano (not shown in html)
+df$ASAres.logp=-log10(df$ASAres.p)
+df$ASAres.colorbyAUC7=ifelse(df$AUC>0.7,"AUC>0.7","AUC<=0.7")
+p= ggplotly(ggplot(df,aes_string(x="AUC",y="ASAres.logp",color="ASAres.colorbyAUC7",label="label"))+theme_bw()+
+  geom_hline(yintercept = -log10(0.05))+
+  geom_point()+
+  theme(legend.title = element_blank()))
+
+# df$label[df$cor2IE<0.5|df$VIP<1]=""
+# df$label[df$Compound.sigcor=="Not Correlated to Internal Exposure"|df$VIP<1]=""
+# df$label[df$Compound.sigcor=="Not Correlated to Internal Exposure"|df$VIP<1]=""
+
+require(ggrepel)
+
+df$GA.VIP.color=ifelse(abs(df$PREG.VIP.dir)<=1,"Unperturbed",ifelse(df$PREG.VIP.dir>1,"Up-regulated","Down-regulated"))
+df$GA.VIP.color=factor(df$GA.VIP.color,levels = c("Up-regulated","Unperturbed","Down-regulated"))
+
+a="Significance in prevention outcome discrimination"
+df$ASAXPREG.dir=ifelse(df$Compliance.VIP.dir*df$PREG.VIP.dir<0 & df$PREG.VIP>1,"opposite and >1","same")
+p10=ggplot(data=df, aes_string(x="Compliance.VIP.dir", y="ASAres.logp",color="GA.VIP.color",label="label")) +  theme_bw() +
+  # scale_color_gradient(low="blue", high="red") +
+  # scale_color_gradient2(low="blue", high="red",mid = "grey",midpoint = 0) +
+  scale_color_manual(values=c("#ff4040", "#999999", "#40a9ff"))+
+  geom_vline(xintercept = c(-1,1),linetype="dashed") +
+  geom_hline(yintercept = c(-log10(0.05)),linetype="dashed") +
+  geom_point(aes_string(size="PREG.VIP"))+ 
+  # scale_size_continuous(range = c(0.1, 3)) +
+  # labs(color="Correlation")+
+  labs(color="Direction of\ncorrelation with GA",size="Absolute value of\ncorrelation with GA")+
+  # xlab("VIP in compliance prediction")+
+  xlab("Variable association (measured by VIP value) with aspirin intake")+
+  ylab(bquote(`Significance for predicting prevention outcome `(-log[10](p))))+ #"Significance in prevention outcome discrimination (-log10(p),t-test)")
+  # ylim(-1, 1)+
+  xlim(-5, 4.5)+
+  geom_text_repel(direction     = "y",
+                  color=ifelse(subset(df,(ASAres.logp>-log10(0.05))&Compliance.VIP.dir>1)$ASAXPREG.dir=="opposite and >1","#505050","#999999"),
+                  size=4.4,
+                  family="Arial Narrow",
+                  data          = subset(df,(ASAres.logp>-log10(0.05))&Compliance.VIP.dir>1),
+                  # nudge_x       = 2.8 - subset(df, Compound.sigcor=="Correlated to Internal Exposure"&AUC>0.7)$VIP,
+                  nudge_x       = 2.8 - subset(df,(ASAres.logp>-log10(0.05))&Compliance.VIP.dir>1)$Compliance.VIP.dir,
+                  hjust        = 0)+
+  geom_text_repel(direction     = "y",
+                  size=4.4,
+                  family="Arial Narrow",
+                  color=ifelse(subset(df,(ASAres.logp>-log10(0.05))&Compliance.VIP.dir<(-1))$ASAXPREG.dir=="opposite and >1","#505050","#999999"),
+                  data          = subset(df,(ASAres.logp>-log10(0.05))&Compliance.VIP.dir<(-1)),
+                  # nudge_x       = 2.8 - subset(df, Compound.sigcor=="Correlated to Internal Exposure"&AUC>0.7)$VIP,
+                  nudge_x       = -4 - subset(df,(ASAres.logp>-log10(0.05))&Compliance.VIP.dir<(-1))$Compliance.VIP.dir,
+                  # nudge_y       = 3,
+                  hjust        = 1)+
+  # # geom_text(position = position_jitter(width = 0.1,height = 0.02))
+  theme(panel.grid.minor =   element_line(size=0.25),
+        legend.position = c(0.85,0.85),
+        legend.background = element_rect(fill = "transparent"),
+        legend.spacing.y = unit(0, 'cm'),
+        legend.key.size = unit(0.4, "cm"),
+        text=element_text(size=18, family="Arial")
+        # panel.grid.major =   element_line(colour = "white",size=0.75)
+        )
 
 
+# ggsave(p10, filename = sprintf("%s/3cpwlogp.pdf",dir.output), device = cairo_pdf,width = 8.7, height = 12)
+# ggsave(p10, filename = sprintf("%s/3cpwlogp.svg",dir.output), device = svglite,width = 8.7, height = 12)
+
+#12
+df$COMP_ID=compAnno$COMP_ID[match(df$label,compAnno$BIOCHEMICAL)]
+df$venn=rep("None",nrow(df))
+df$venn[df$Compliance.VIP>1]="Aspirin-altered"
+df$venn[df$ASAres.p<0.05]="Differential in outcome"
+df$venn[df$ASAres.p<0.05&df$Compliance.VIP>1]="Both"
+df$venn=factor(df$venn,levels = c("Aspirin-altered","Differential in outcome","Both","None"))
+p9=ggplot(
+  # data=subset(df,Compound.sigcor=="Correlated to Internal Exposure"&AUC>0.7),
+  # data=subset(df,df$Compliance.VIP>1|df$ASAres.p<0.05),
+  data=df,
+  aes_string(x="Internal.Exposure", y="Compound",color="venn",label="pair")) +  theme_bw() +
+  # coord_fixed(ratio=1) +
+  scale_color_manual(values=c("#ff4040", "#f0d400", "#ff8800","grey"))+
+  # scale_color_gradient(low="blue", high="red") +
+  geom_hline(yintercept = 0,color="darkgrey") +
+  geom_vline(xintercept = 0,color="darkgrey") +
+  geom_abline(slope=1,intercept = 0,linetype="dashed") +
+  geom_point()+
+  # geom_point()+
+  # geom_abline(slope=1,intercept = -9.34,linetype="dashed") +
+  # xlim(-5.1,6)+
+  theme(legend.title = element_blank(),
+        legend.position = c(0.82,0.15),
+        legend.key.size = unit(0.3,"cm"),
+        legend.spacing.y = unit(0.1,"cm"),
+        text=element_text(size=17, family="Arial"),
+        legend.background = element_rect(fill=alpha("white",alpha = 0.8)))+
+  geom_text_repel(
+                  # direction     = "y",
+                  color="#505050",
+                  size=5.5,
+                  family="Arial",
+                  # data          = subset(df,df$Compliance.VIP>1|df$ASAres.p<0.05),
+                  data          = subset(df,Compound>Internal.Exposure),
+                  nudge_y = 0.9,
+                  nudge_x       = -6 - subset(df, Compound.sigcor=="Correlated to Internal Exposure"&AUC>0.7)$`Internal.Exposure`,
+                  hjust        = 0)+
+  xlab("Significance of internal exposure (bits)") +
+  ylab("Significance of compound (bits)")
+
+p9 + labs(title = "Significance of individual metabolite in mediating intervention outcome compared to internal exposure, measured by information loss caused at the removal of the variable. When distributed on the right of line y=x, removal of internal exposure costs higher information loss than removal of the compound.")
+
+# pdf(file="allmetsASAASAres.pdf",height = 6,width = 5)
+# p
+# dev.off()
+
+# ggsave(p9,filename = sprintf("%s/allmetsASAASAres.pdf",dir.output),height = 4,width = 8,device = cairo_pdf)
+# ggsave(p9,filename = sprintf("%s/allmetsASAASAres.svg",dir.output),height = 4,width = 8,device = svglite)
+#185
+
+
+# p=ggplot(data=df, aes_string(x="Internal.Exposure", y="Compound",color="cor2IE",label="pair")) +  theme_bw() +
+#   coord_fixed(ratio=1) +
+#   scale_color_gradient(low="blue", high="red") +
+#   # geom_point(color="red")+
+#   geom_point()+
+#   geom_hline(yintercept = 0,color="darkgrey") +
+#   geom_vline(xintercept = 0,color="darkgrey") +
+#   geom_abline(slope=1,intercept = 0,linetype="dashed") +
+#   # geom_abline(slope=1,intercept = -9.35,linetype="dashed") +
+#   xlim(-5.1,8)+
+#   geom_text_repel(direction     = "y",
+#                   # color="#505050",
+#                   data          = subset(df,Compound.sigcor=="Correlated to Internal Exposure"&AUC>0.7),
+#                   nudge_x       = 3.3 - subset(df, Compound.sigcor=="Correlated to Internal Exposure"&AUC>0.7)$`Internal.Exposure`,
+#                   hjust        = 0)+
+#   xlab("Significance of internal exposure (bits)") +
+#   ylab("Significance of compound (bits)")+
+#   labs(color="Correlation")+
+#   theme(legend.position = c(0.9,0.2))
+# 
+# p
+# pdf(file = "VaribaleBits185.pdf",width =10, height=7)
+# p
+# dev.off()
+```
+
+## combined effects of aspirin on gestional pregression and preeclapsia outcome
+Over one-third (26/73) of these differential metabolites were altered by aspirin, including aspirin’s derivative metabolites salicylate and 4-hydroxyhippurate. Lipids (8/26) and steroids (6/26) occupied more than half of the list, reinforcing their association with pregnancy outcome and response to aspirin treatment. **Figure 4C**
+
+```{r ASA-PREG-PE-2, nclude=TRUE,message=FALSE,warning=FALSE,fig.width=8,fig.height=8}
+p10 + labs(title = "Metabolites (n=625) under the impact of aspirin, pregnancy and their associations with preeclampsia prevention. Correlation with aspirin intake and gestation advancement is measured by variable importance on projection (VIP) in first-pass compliance prediction model and gestational age prediction model, respectively. Direction of correlation is indicated by positive/negative VIP value for impact of aspirin and color of the dot for gestational age. Metabolites with VIP>1 in prediction of gestational age are colored in red/blue if positively/negatively correlated with gestational age. Horizontal dashed line, p=0.05; Vertical dashed lines, |VIP|=1. Labeled compounds are 1) associated with aspirin intake (|VIP|>1) and 2) predictive of prevention outcome (p<0.05). Within labeled compounds, those changed in opposite direction over aspirin administration and gestation advancement are underlined and in black.")
 
 ```
