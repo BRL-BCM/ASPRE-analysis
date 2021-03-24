@@ -1,5 +1,10 @@
 ---
 title: "ASPRE-analysis"
+knit: (function(input_file, encoding) {
+  out_dir <- 'docs';
+  rmarkdown::render(input_file,
+  encoding=encoding,
+  output_file=file.path(dirname(input_file), out_dir, 'index.html'))})
 author: "Xiqi Li"
 date: "3/23/2021"
 output: 
@@ -10,15 +15,15 @@ output:
     toc_depth: 3
     theme: cosmo
 editor_options: 
-  chunk_output_type: console
   
+  chunk_output_type: console
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-knitr::opts_knit$set(root.dir = "/Volumes/Seagate-2C/BaylorMHG/PE_ASA/GitHub.Mar.2021")
+knitr::opts_knit$set(root.dir = "/Volumes/Seagate-2C/BaylorMHG/PE_ASA/ASPRE-analysis/docs")
 
-setwd("/Volumes/Seagate-2C/BaylorMHG/PE_ASA/GitHub.Mar.2021")
+setwd("/Volumes/Seagate-2C/BaylorMHG/PE_ASA/ASPRE-analysis/docs")
 # load(file = "/Volumes/Seagate-2C/BaylorMHG/PE_ASA/GitHub.Mar.2021/dataSet.RData")
 # dataset=dataset[c("data_zscore","data_raw")]
 # sampleAttr=sampleAttr[,c("sIDs","ga.w","ptIDs","ASA","pt_compliance",Compliance....,"pe","trimester","ASA_tri","ASA_tri_chr","pe.risk","consss_batch")]
@@ -38,8 +43,8 @@ require(repmis)
 require(plotly)
 require(R.utils)
 require(ggpubr)
-invisible(source_data("https://github.com/BRL-BCM/ASPRE-analysis/raw/main/dataSet.RData?raw=True"))
-source_url("https://github.com/BRL-BCM/ASPRE-analysis/raw/main/func.R")
+invisible(source_data("https://github.com/BRL-BCM/ASPRE-analysis/raw/main/data/dataSet.RData?raw=True"))
+source_url("https://github.com/BRL-BCM/ASPRE-analysis/raw/main/R/func.R")
 
 #---- get full data_mx, before removing outliers ----
 input=list(rmX="No",level="zscore",fillThreshold=0.2,DiffThr=0.5,
@@ -66,14 +71,14 @@ if(feature %in% colnames(sampleAttr)){
 }else{
   p.pca.3=plot_ly(x=1:10,y=1:10) %>% layout(title = "Not Applicable")
 }
-invisible(mkdirs("QuanlityAssessment"))
-orca(p.pca.3,sprintf("/QuanlityAssessment/PCA.%s.%s.%s.pdf",metReport$input$level,feature,metReport$input$batchEffectCorrectMethod))
+# invisible(mkdirs("QuanlityAssessment"))
+# orca(p.pca.3,sprintf("/QuanlityAssessment/PCA.%s.%s.%s.pdf",metReport$input$level,feature,metReport$input$batchEffectCorrectMethod))
 
 feature="consss_batch"
 p.pca.4=plot_ly(x=temp$x[,1], y=temp$x[,2], z=temp$x[,3], type="scatter3d", mode="markers",
                     color = sampleAttr[,feature],text=sampleAttr$sIDs) %>%
     layout(title = "PCA categorizedOutlier",scene=list(camera=list(eye=list(x = 1, y =-1, z = 1.5))))
-orca(p.pca.4,sprintf("/QuanlityAssessment/PCA.%s.%s.%s.pdf",metReport$input$level,feature,metReport$input$batchEffectCorrectMethod))
+# orca(p.pca.4,sprintf("/QuanlityAssessment/PCA.%s.%s.%s.pdf",metReport$input$level,feature,metReport$input$batchEffectCorrectMethod))
 p.pca.3
 p.pca.4
 rm(list=setdiff(ls(),c(lsf.str(),"metReport","compAnno")))
@@ -207,16 +212,16 @@ p4=p4+theme(legend.position = "none")
 p=ggarrange(temp,p2,legend1,legend2,p3,p4,legend3,legend4,ncol=2, nrow=4, common.legend = F)
 # p
 #title(main = "Distribution of summary statistics per sample")
-ggsave(p,filename = sprintf("QuanlityAssessment/UMAP.%s.%s.%s.pdf",
-                            metReport$input$level,
-                            dim(sampleAttr)[1],
-                            metReport$input$batchEffectCorrectMethod),
-       height = 16,width = 8,device = cairo_pdf)
-ggsave(p,filename = sprintf("QuanlityAssessment/UMAP.%s.%s.%s.svg",
-                            metReport$input$level,
-                            dim(sampleAttr)[1],
-                            metReport$input$batchEffectCorrectMethod),
-       height = 16,width = 8,device = svglite)
+# ggsave(p,filename = sprintf("QuanlityAssessment/UMAP.%s.%s.%s.pdf",
+#                             metReport$input$level,
+#                             dim(sampleAttr)[1],
+#                             metReport$input$batchEffectCorrectMethod),
+#        height = 16,width = 8,device = cairo_pdf)
+# ggsave(p,filename = sprintf("QuanlityAssessment/UMAP.%s.%s.%s.svg",
+#                             metReport$input$level,
+#                             dim(sampleAttr)[1],
+#                             metReport$input$batchEffectCorrectMethod),
+#        height = 16,width = 8,device = svglite)
 ```
 
 # Metabolites and pathways affected by aspirin treatment
@@ -229,8 +234,8 @@ require(devtools)
 require(repmis)
 require(xlsx)
 
-invisible(source_data("https://github.com/BRL-BCM/ASPRE-analysis/raw/main/dataSet.RData?raw=True"))
-source_url("https://github.com/BRL-BCM/ASPRE-analysis/raw/main/func.R")
+invisible(source_data("https://github.com/BRL-BCM/ASPRE-analysis/raw/main/data/dataSet.RData?raw=True"))
+source_url("https://github.com/BRL-BCM/ASPRE-analysis/raw/main/R/func.R")
 
 #---- get full data_mx with outliers excluded ----
 outliers=c(sampleAttr$sIDs[sampleAttr$consss_batch!="non-outlier"])
@@ -352,13 +357,13 @@ write.xlsx(MOF.df,file=sprintf("%s/Table.UVA.xlsx",dir.output))
 ```{r Aspirin-MVA, include=TRUE,message=FALSE,warning=FALSE,fig.show="hold", out.width="50%"}
 rm(list=ls())
 dir.output="aspirin.MVA"
-invisible(mkdirs(dir.output))
+# invisible(mkdirs(dir.output))
 require(ropls)
 require(R.utils)
 require(reshape2)
 
-invisible(source_data("https://github.com/BRL-BCM/ASPRE-analysis/raw/main/dataSet.RData?raw=True"))
-source_url("https://github.com/BRL-BCM/ASPRE-analysis/raw/main/func.R")
+invisible(source_data("https://github.com/BRL-BCM/ASPRE-analysis/raw/main/data/dataSet.RData?raw=True"))
+source_url("https://github.com/BRL-BCM/ASPRE-analysis/raw/main/R/func.R")
 
 #---- get full data_mx with outliers excluded ----
 outliers=c(sampleAttr$sIDs[sampleAttr$consss_batch!="non-outlier"])
@@ -431,7 +436,7 @@ VIP.df=data.frame(COMP_ID=compAnno$COMP_ID[match(names(VIP),compAnno$COMP_ID)],
                   VIP=VIP,
                   Xloadings=oplsda@loadingMN[match(names(VIP),rownames(oplsda@loadingMN)),]
                   )
-save(oplsda,VIP,VIP.df,file=sprintf("%s/ASA2.oplsda.compliance.train-only.%s.RData",dir.output,TrainSet))
+# save(oplsda,VIP,VIP.df,file=sprintf("%s/ASA2.oplsda.compliance.train-only.%s.RData",dir.output,TrainSet))
 rm(list=setdiff(ls(),c(lsf.str(),"metReport","compAnno","TrainSet","dir.output")))
 
 #---- OPLS-DA score plot ----
@@ -439,8 +444,8 @@ load(sprintf("%s/ASA2.oplsda.compliance.train-only.%s.RData",dir.output,TrainSet
 p=ropls.plot(oplsda,plottype = "score", xvar = "p1", yvar = "o1", hotelling=T)+theme_bw() +
   labs(title = "OPLS Score plot of Training Set")
 require(svglite)
-ggsave(p,filename = sprintf("%s/ASA2.scoreplot.svg",dir.output),height = 4,width = 4,device = svglite)
-ggsave(p,filename = sprintf("%s/ASA2.scoreplot.pdf",dir.output),height = 4,width = 4,device = cairo_pdf)
+# ggsave(p,filename = sprintf("%s/ASA2.scoreplot.svg",dir.output),height = 4,width = 4,device = svglite)
+# ggsave(p,filename = sprintf("%s/ASA2.scoreplot.pdf",dir.output),height = 4,width = 4,device = cairo_pdf)
 p1=p
 
 #---- plot model R2Y Q2Y metrics ----
@@ -455,8 +460,8 @@ df=melt(df,id.vars = c("n","sim"),variable.name = "performance")
 p=ggplot(df,aes_string(x="sim",y="value",color ="performance")) + geom_point() + theme_bw() +
   xlab("Similarity(response,perm-response)")
 p=p+theme_bw()+theme(legend.position = c(0.75,0.3))+xlab("Reported compliance")+ylab("Predicted compliance") +labs(title = "Validation plot of the OPLS-DA model obtained from 50 permutation tests")
-ggsave(p,filename = sprintf("%s/ASA2.modelmetrics.svg",dir.output),height = 4,width = 4,device = svglite)
-ggsave(p,filename = sprintf("%s/ASA2.modelmetrics.pdf",dir.output),height = 4,width = 4,device = cairo_pdf)
+# ggsave(p,filename = sprintf("%s/ASA2.modelmetrics.svg",dir.output),height = 4,width = 4,device = svglite)
+# ggsave(p,filename = sprintf("%s/ASA2.modelmetrics.pdf",dir.output),height = 4,width = 4,device = cairo_pdf)
 p2=p
 p1
 p2
@@ -559,8 +564,8 @@ rm(list=ls())
 require(ropls)
 require(R.utils)
 
-invisible(source_data("https://github.com/BRL-BCM/ASPRE-analysis/raw/main/dataSet.RData?raw=True"))
-source_url("https://github.com/BRL-BCM/ASPRE-analysis/raw/main/func.R")
+invisible(source_data("https://github.com/BRL-BCM/ASPRE-analysis/raw/main/data/dataSet.RData?raw=True"))
+source_url("https://github.com/BRL-BCM/ASPRE-analysis/raw/main/R/func.R")
 
 #---- get full data_mx with outliers excluded ----
 outliers=c(sampleAttr$sIDs[sampleAttr$consss_batch!="non-outlier"])
@@ -576,7 +581,7 @@ rm(list=setdiff(ls(),c(lsf.str(),"metReport","compAnno")))
 
 # #-----make 20-fold CV model----
 dir.output="aspirin.MVA"
-invisible(mkdirs(dir.output))
+# invisible(mkdirs(dir.output))
 TrainSet=c("all","tri2")[2]
 data_mx=metReport$data_mx
 sampleAttr=metReport$sampleAttr
@@ -624,8 +629,8 @@ p=p+theme_bw()+theme(legend.position = c(0.35,0.5),
                    )+
   xlab("Predicted Compliance")+ylab("Reported Compliance")
 p1=p
-ggsave(p,filename = sprintf("%s/Aspirin.PredictedVsActual.PEoverlay.pdf",dir.output),height = 4,width = 4,device = cairo_pdf)
-ggsave(p,filename = sprintf("%s/Aspirin.PredictedVsActual.PEoverlay.svg",dir.output),height = 4,width = 4,device = svglite)
+# ggsave(p,filename = sprintf("%s/Aspirin.PredictedVsActual.PEoverlay.pdf",dir.output),height = 4,width = 4,device = cairo_pdf)
+# ggsave(p,filename = sprintf("%s/Aspirin.PredictedVsActual.PEoverlay.svg",dir.output),height = 4,width = 4,device = svglite)
 
 #---- predicted compliance independently predicts preeclampsia development ----
 require(ggpubr)
@@ -641,8 +646,8 @@ p = ggboxplot(temp, x = "group", y = "value",color = "group",
   stat_compare_means( label = "p", label.x = 1.5,method = "t.test") +
   ylab("value") +theme(axis.text.x=element_blank())
 p2=p
-ggsave(p,filename = sprintf("%s/Aspirin.ReportedVsPredictedCompliance.PE.pdf",dir.output),height = 4,width = 4,device = cairo_pdf)
-ggsave(p,filename = sprintf("%s/Aspirin.ReportedVsPredictedCompliance.PE.svg",dir.output),height = 4,width = 4,device = svglite)
+# ggsave(p,filename = sprintf("%s/Aspirin.ReportedVsPredictedCompliance.PE.pdf",dir.output),height = 4,width = 4,device = cairo_pdf)
+# ggsave(p,filename = sprintf("%s/Aspirin.ReportedVsPredictedCompliance.PE.svg",dir.output),height = 4,width = 4,device = svglite)
 
 p1
 p2
@@ -684,13 +689,13 @@ write.xlsx(AIC.df,file = sprintf("%s/ASA2.AIC.predCompliance2PE.xlsx",dir.output
 ```{r PREG-MVA, include=TRUE,message=FALSE,warning=FALSE,fig.show="hold", out.width="33%"}
 rm(list=ls())
 dir.output="PREG.MVA"
-invisible(mkdirs(dir.output))
+# invisible(mkdirs(dir.output))
 require(ropls)
 require(R.utils)
 require(reshape2)
 
-invisible(source_data("https://github.com/BRL-BCM/ASPRE-analysis/raw/main/dataSet.RData?raw=True"))
-source_url("https://github.com/BRL-BCM/ASPRE-analysis/raw/main/func.R")
+invisible(source_data("https://github.com/BRL-BCM/ASPRE-analysis/raw/main/data/dataSet.RData?raw=True"))
+source_url("https://github.com/BRL-BCM/ASPRE-analysis/raw/main/R/func.R")
 
 #---- get full data_mx with outliers excluded ----
 outliers=c(sampleAttr$sIDs[sampleAttr$consss_batch!="non-outlier"])
@@ -706,7 +711,7 @@ rm(list=setdiff(ls(),c(lsf.str(),"metReport","compAnno")))
 
 #---- make model for train-only to get permutation plot ----
 dir.output="PREG.MVA"
-invisible(mkdirs(dir.output))
+# invisible(mkdirs(dir.output))
 data_mx=metReport$data_mx
 sampleAttr=metReport$sampleAttr
 data_mx=t(data_mx)
@@ -767,8 +772,8 @@ p=ggplot(df, aes_string(x = "Actual", y = "Predicted",label="sampleID")) + theme
   xlab("True GA")+ylab("Predicted GA") +
   geom_point(aes_string(col="group")) + geom_smooth(method='lm')
 p1=p
-ggsave(p,filename = sprintf("%s/PREG.actual-predict.pdf",dir.output),height = 4,width = 4,device = cairo_pdf)
-ggsave(p,filename = sprintf("%s/PREG.actual-predict.svg",dir.output),height = 4,width = 4,device = svglite)
+# ggsave(p,filename = sprintf("%s/PREG.actual-predict.pdf",dir.output),height = 4,width = 4,device = cairo_pdf)
+# ggsave(p,filename = sprintf("%s/PREG.actual-predict.svg",dir.output),height = 4,width = 4,device = svglite)
 # ggplotly(p)
 
 # density plot
@@ -777,33 +782,33 @@ p = ggplot(df, aes_string(x="Predicted",fill=colorby))+
   geom_density(alpha=0.4)
 p= p + xlab("Predicted GA (weeks)") + ylab("Density") +theme_bw()+theme(legend.position = c(0.7,0.9),legend.title = element_blank(),legend.background = element_rect(fill=alpha('white', 0.1)))
 p2=p
-ggsave(p,filename = sprintf("%s/PREG.PredictedGAdensity.pdf",dir.output),height = 4,width = 4,device = cairo_pdf)
-ggsave(p,filename = sprintf("%s/PREG.PredictedGAdensity.svg",dir.output),height = 4,width = 4,device = svglite)
+# ggsave(p,filename = sprintf("%s/PREG.PredictedGAdensity.pdf",dir.output),height = 4,width = 4,device = cairo_pdf)
+# ggsave(p,filename = sprintf("%s/PREG.PredictedGAdensity.svg",dir.output),height = 4,width = 4,device = svglite)
 
-#residual plot
-model<-lm(Predicted~Actual,data=df[df$group!="2nd trimester, aspirin-treated",])
-require(Metrics)
-knitr::kable(data.frame(MAE=mae(df$Actual[df$group!="2nd trimester, aspirin-treated"],df$Predicted[df$group!="2nd trimester, aspirin-treated"]),
-                        `R-squre`=(summary(model))$adj.r.squared))
-resd=df$Predicted-stats::predict(model,newdata=df)
-names(resd)=df$sampleID
-df$lm.resd=resd
-require(ggpubr)
-knitr::kable(df %>% group_by(group) %>% summarise(mean=mean(lm.resd)))
-stat.mean=compare_means(lm.resd ~ group,  data = df,
-              ref.group = ".all.", method = "t.test",p.adjust.method = "bonferroni") %>% rstatix::add_significance("p.adj")
-df$group=factor(df$group,levels = c("1st trimester, pre-treatment","2nd trimester, aspirin-treated","2nd trimester, placebo-treated"))
-p = ggboxplot(df, x = "group", y = "resd",col="group",add = "jitter") + #rotate_x_text(angle = 90) +
-  stat_compare_means(method = "anova", label.y = 6) +        # Add global annova p-value
-  stat_pvalue_manual(stat.mean,label = "p.adj.signif",x="group2",y.position = 5)+
-  ylab("residual GA (weeks)") + xlab("") + theme(axis.text.x = element_blank(),legend.title = element_blank(), legend.direction = "vertical")
-p3=p
-ggsave(p,filename = sprintf("%s/PREG.ResidualGA.pdf",dir.output),height = 4,width = 4,device = cairo_pdf)
-ggsave(p,filename = sprintf("%s/PREG.ResidualGA.svg",dir.output),height = 4,width = 4,device = svglite)
-save(df,file=sprintf("%s/PREG.actual_pred_resd.RData",dir.output))
+# #residual plot
+# model<-lm(Predicted~Actual,data=df[df$group!="2nd trimester, aspirin-treated",])
+# require(Metrics)
+# knitr::kable(data.frame(MAE=mae(df$Actual[df$group!="2nd trimester, aspirin-treated"],df$Predicted[df$group!="2nd trimester, aspirin-treated"]),
+#                         `R-squre`=(summary(model))$adj.r.squared))
+# resd=df$Predicted-stats::predict(model,newdata=df)
+# names(resd)=df$sampleID
+# df$lm.resd=resd
+# require(ggpubr)
+# knitr::kable(df %>% group_by(group) %>% summarise(mean=mean(lm.resd)))
+# stat.mean=compare_means(lm.resd ~ group,  data = df,
+#               ref.group = ".all.", method = "t.test",p.adjust.method = "bonferroni") %>% rstatix::add_significance("p.adj")
+# df$group=factor(df$group,levels = c("1st trimester, pre-treatment","2nd trimester, aspirin-treated","2nd trimester, placebo-treated"))
+# p = ggboxplot(df, x = "group", y = "resd",col="group",add = "jitter") + #rotate_x_text(angle = 90) +
+#   stat_compare_means(method = "anova", label.y = 6) +        # Add global annova p-value
+#   stat_pvalue_manual(stat.mean,label = "p.adj.signif",x="group2",y.position = 5)+
+#   ylab("residual GA (weeks)") + xlab("") + theme(axis.text.x = element_blank(),legend.title = element_blank(), legend.direction = "vertical")
+# p3=p
+# ggsave(p,filename = sprintf("%s/PREG.ResidualGA.pdf",dir.output),height = 4,width = 4,device = cairo_pdf)
+# ggsave(p,filename = sprintf("%s/PREG.ResidualGA.svg",dir.output),height = 4,width = 4,device = svglite)
+# save(df,file=sprintf("%s/PREG.actual_pred_resd.RData",dir.output))
 p1
 p2
-p3
+# p3
 ```
 
 # Combined effects of aspirin treatment on preeclampsia prevention and the gestational age advancement
@@ -812,13 +817,13 @@ p3
 
 rm(list=ls())
 dir.output="CombinedEffect"
-invisible(mkdirs(dir.output))
+# invisible(mkdirs(dir.output))
 require(ropls)
 require(R.utils)
 require(reshape2)
 
-invisible(source_data("https://github.com/BRL-BCM/ASPRE-analysis/raw/main/dataSet.RData?raw=True"))
-source_url("https://github.com/BRL-BCM/ASPRE-analysis/raw/main/func.R")
+invisible(source_data("https://github.com/BRL-BCM/ASPRE-analysis/raw/main/data/dataSet.RData?raw=True"))
+source_url("https://github.com/BRL-BCM/ASPRE-analysis/raw/main/R/func.R")
 
 #---- get full data_mx with outliers excluded ----
 outliers=c(sampleAttr$sIDs[sampleAttr$consss_batch!="non-outlier"])
