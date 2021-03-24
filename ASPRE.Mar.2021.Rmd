@@ -1,0 +1,901 @@
+---
+title: "ASPRE-analysis"
+author: "Xiqi Li"
+date: "3/23/2021"
+output: 
+  html_document:
+    number_sections: TRUE
+    code_folding: hide
+    toc: true
+    toc_depth: 3
+    theme: cosmo
+editor_options: 
+  chunk_output_type: console
+  
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "/Volumes/Seagate-2C/BaylorMHG/PE_ASA/GitHub.Mar.2021")
+
+setwd("/Volumes/Seagate-2C/BaylorMHG/PE_ASA/GitHub.Mar.2021")
+# load(file = "/Volumes/Seagate-2C/BaylorMHG/PE_ASA/GitHub.Mar.2021/dataSet.RData")
+# dataset=dataset[c("data_zscore","data_raw")]
+# sampleAttr=sampleAttr[,c("sIDs","ga.w","ptIDs","ASA","pt_compliance",Compliance....,"pe","trimester","ASA_tri","ASA_tri_chr","pe.risk","consss_batch")]
+# save(compAnno,dataset,sampleAttr,file="/Volumes/Seagate-2C/BaylorMHG/PE_ASA/GitHub.Mar.2021/dataSet.RData")
+```
+
+## Data Quality Control
+1. Get z-score matrix of all frequently-detected molecules (dectected and z-scored in more than 80% samples) for all 198 samples.
+2. PCA Visualizaion of samples by metabolon. profiling batches, as well as stage of pregnancy (trimesters) when samples were collected - **Figure S2a**
+3. UMAP Visualizaion - **Figure S2b,c**
+4. Outilers were removed from downstream analysis
+
+```{r Data-Quality-Control,echo=FALSE,warning=FALSE,message=FALSE,fig.width=6,fig.height=3,fig.align='center'}
+rm(list = ls())
+require(devtools)
+require(repmis)
+require(plotly)
+require(R.utils)
+require(ggpubr)
+invisible(source_data("https://github.com/BRL-BCM/ASPRE-analysis/raw/main/dataSet.RData?raw=True"))
+source_url("https://github.com/BRL-BCM/ASPRE-analysis/raw/main/func.R")
+
+#---- get full data_mx, before removing outliers ----
+input=list(rmX="No",level="zscore",fillThreshold=0.2,DiffThr=0.5,
+           batchEffectCorrectMethod="none",
+           sampleFeature="ASA_tri_chr",
+           outliers="none")
+temp=PEASA.getDataMxByInput(input)
+metReport=list(data_mx=temp$data_mx,sampleAttr=temp$sampleAttr,input=input)
+rm(list=setdiff(ls(),c(lsf.str(),"metReport","compAnno")))
+```
+
+### PCA
+```{r Data-Quality-Control-PCA,echo=TRUE,warning=FALSE,message=FALSE,fig.width=8,fig.height=4,fig.align='center'}
+#---- PCA -----
+data_mx=metReport$data_mx
+sampleAttr=metReport$sampleAttr
+temp=prcomp(t(data_mx[getFill(data_mx)==1,]))
+feature=metReport$input$sampleFeature
+
+if(feature %in% colnames(sampleAttr)){
+  p.pca.3 = plot_ly(x=temp$x[,1], y=temp$x[,2], z=temp$x[,3], type="scatter3d", mode="markers",
+                    color = sampleAttr[,feature],text=sampleAttr$sIDs) %>%
+    layout(title = "PCA runBatch+trimester",scene=list(camera=list(eye=list(x = 1, y =-1, z = 1.5))))
+}else{
+  p.pca.3=plot_ly(x=1:10,y=1:10) %>% layout(title = "Not Applicable")
+}
+invisible(mkdirs("QuanlityAssessment"))
+orca(p.pca.3,sprintf("/QuanlityAssessment/PCA.%s.%s.%s.pdf",metReport$input$level,feature,metReport$input$batchEffectCorrectMethod))
+
+feature="consss_batch"
+p.pca.4=plot_ly(x=temp$x[,1], y=temp$x[,2], z=temp$x[,3], type="scatter3d", mode="markers",
+                    color = sampleAttr[,feature],text=sampleAttr$sIDs) %>%
+    layout(title = "PCA categorizedOutlier",scene=list(camera=list(eye=list(x = 1, y =-1, z = 1.5))))
+orca(p.pca.4,sprintf("/QuanlityAssessment/PCA.%s.%s.%s.pdf",metReport$input$level,feature,metReport$input$batchEffectCorrectMethod))
+p.pca.3
+p.pca.4
+rm(list=setdiff(ls(),c(lsf.str(),"metReport","compAnno")))
+```
+
+### UMAP
+```{r Data-Quality-Control-UMAP,echo=TRUE,warning=FALSE,message=FALSE,fig.width=7,fig.height=4.3,fig.align='center'}
+#---- UMAP ----
+require(cowplot)
+require(svglite)
+data_mx=metReport$data_mx
+sampleAttr=metReport$sampleAttr
+data_mx=imputeMissingValues(data_mx,data_mx)
+
+n_neighbors=round(0.25*as.numeric(ncol(data_mx)))
+min_dist=0.1
+
+# plotfunction
+plot.umap=function(data_mx,sampleAttr,feature){
+  config=umap.defaults
+  config$n_neighbors=n_neighbors
+  config$min_dist=min_dist
+  UMAP=umap::umap(t(as.matrix(data_mx)),config = config)
+  tmp=unlist(lapply(as.list(sampleAttr), class))
+  if (feature %in% names(tmp[tmp=="character"])){ 
+    temp3=umap(data_mx,n_neighbors,min_dist,labels = as.factor(sampleAttr[,feature]), 
+               seed = 3,
+               legendtextsize = 9,dotsize = 2,axistextsize = 10,text = sampleAttr$sIDs, textlabelsize = 0)
+  
+  }else if (feature %in% names(tmp[tmp=="numeric"])|feature =="mean_abs_zscore"|feature =="sd"){
+    if(feature=="mean_abs_zscore"){
+      sampleAttr[,"mean_abs_zscore"]=apply(data_mx,c(2), function(x) mean(abs(x),na.rm=T))
+    }else if(feature=="sd"){
+      sampleAttr[,"sd"]=apply(data_mx,c(2), function(x) sd(x,na.rm=T))
+      }
+    scores <- data.frame(UMAP$layout)
+    # feature=
+    # feature=replace(feature,feature==0,20)
+    scores[,feature]=sampleAttr[[feature]]
+    axistextsize=10
+    dotsize=2
+    legendtextsize=9
+    textlablesize=1
+    
+    temp3 <- ggplot(data = scores, aes(x = X1, y = X2, label=sampleAttr$sIDs)) +
+      geom_point(aes_string(colour = feature),
+                 size = dotsize) + theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.text.y = element_text(size = axistextsize,
+                                       colour = "black"),
+            axis.text.x = element_text(size = axistextsize,
+                                       colour = "black"),
+            axis.title.x = element_text(size = axistextsize),
+            axis.title.y = element_text(size = axistextsize),
+            legend.title = element_text(size = legendtextsize),
+            legend.text = element_text(size = legendtextsize)) +
+      # labs(colour = feature) +
+      scale_colour_gradientn(colors = greenred(10)) # +
+      # geom_text(vjust = "inward", hjust = "inward", size = textlablesize)
+  }else if (feature %in% c("salicylate","2-hydroxyhippurate (salicylurate)","heme","arginine","glucose")){
+    # config=umap.defaults
+    # config$n_neighbors=n_neighbors
+    # config$min_dist=min_dist
+    # UMAP=umap::umap(t(as.matrix(data_mx)),config = config)
+    scores <- data.frame(UMAP$layout)
+    feature = compAnno$COMP_ID[compAnno$BIOCHEMICAL==feature]
+    feature = feature[!is.na(feature)]
+    feature=data_mx[feature,]
+    scores$feature=feature
+    axistextsize=10
+    dotsize=2
+    legendtextsize=9
+    textlablesize=1
+    temp3 <- ggplot(data = scores, aes(x = X1, y = X2, label=sampleAttr$sIDs)) + geom_point(aes(colour = feature),
+                                                                                            size = dotsize) + theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(), axis.text.y = element_text(size = axistextsize,
+                                                                           colour = "black"),
+            axis.text.x = element_text(size = axistextsize,
+                                       colour = "black"), axis.title.x = element_text(size = axistextsize),
+            axis.title.y = element_text(size = axistextsize),
+            legend.title = element_text(size = legendtextsize),
+            legend.text = element_text(size = legendtextsize)) # +
+      labs(colour = feature) + scale_colour_gradient(low = "blue",
+                                                     high = "red")
+  }
+  return(temp3)
+}
+
+# by run batch * trimester
+temp=umap(data_mx,n_neighbors,min_dist,labels = as.factor(sampleAttr$ASA_tri_chr), 
+          seed = 3,
+          legendtitle = "",legendtextsize = 9,dotsize = 2,axistextsize = 10,text = sampleAttr$sIDs,textlabelsize = 0)
+# by outlier group
+feature="consss_batch"
+p2=plot.umap(data_mx = data_mx,sampleAttr = sampleAttr,feature = feature)+
+  theme(legend.position = "bottom",legend.direction = "vertical",legend.title = element_blank())
+# by mean absolute zscore
+feature="mean_abs_zscore"
+p3=plot.umap(data_mx = data_mx,sampleAttr = sampleAttr,feature = feature)+theme(legend.position = "bottom")+ labs(color='mean\nabsolute\nzscore') 
+# by zscore sd
+feature="sd"
+p4=plot.umap(data_mx = data_mx,sampleAttr = sampleAttr,feature = feature)+theme(legend.position = "bottom")
+
+ply1=ggplotly(temp) %>% layout(legend = list(orientation = "h", x = 0., y = -0.05))
+ply1$x$data[[5]]$text=""
+ply2=ggplotly(p2) %>% layout(legend = list(orientation = "h", x = 0., y = -0.05))
+ply2$x$data[[length(unique(sampleAttr$consss_batch))+1]]$text=""
+ply3=ggplotly(p3) %>% layout(legend = list(orientation = "h", x = 0., y = -0.05))
+ply4=ggplotly(p4) %>% layout(legend = list(orientation = "h", x = 0., y = -0.05))
+
+subplot(ply1,ply3,
+        which_layout = 1,
+        nrows = 1)
+# ggarrange(legend1,legend3,heights = 1)
+subplot(ply2,ply4,
+        which_layout = 1,
+        nrows = 1)
+# ggarrange(legend2,legend4,heights = c(0.1))
+
+legend1=cowplot::get_legend(temp)
+temp=temp + theme(legend.position = "none")
+legend2=cowplot::get_legend(p2)
+p2=p2+theme(legend.position = "none")
+legend3=cowplot::get_legend(p3)
+p3=p3+theme(legend.position = "none")
+legend4=cowplot::get_legend(p4)
+p4=p4+theme(legend.position = "none")
+
+p=ggarrange(temp,p2,legend1,legend2,p3,p4,legend3,legend4,ncol=2, nrow=4, common.legend = F)
+# p
+#title(main = "Distribution of summary statistics per sample")
+ggsave(p,filename = sprintf("QuanlityAssessment/UMAP.%s.%s.%s.pdf",
+                            metReport$input$level,
+                            dim(sampleAttr)[1],
+                            metReport$input$batchEffectCorrectMethod),
+       height = 16,width = 8,device = cairo_pdf)
+ggsave(p,filename = sprintf("QuanlityAssessment/UMAP.%s.%s.%s.svg",
+                            metReport$input$level,
+                            dim(sampleAttr)[1],
+                            metReport$input$batchEffectCorrectMethod),
+       height = 16,width = 8,device = svglite)
+```
+
+# Metabolites and pathways affected by aspirin treatment
+## Univariate analysis (UVA)
+To identify the metabolites perturbed in response to aspirin treatment, we compared metabolomics profiles in **aspirin-2nd** samples with **placebo-2nd** samples. Univariate analysis (UVA) using t-test and False Discovery Rate (FDR) correction for multiple testing yielded 28 significantly perturbed metabolites - **Table S2**
+
+```{r ttest-4groups, include=TRUE,echo=TRUE,warning=FALSE,message=FALSE}
+rm(list = ls())
+require(devtools)
+require(repmis)
+require(xlsx)
+
+invisible(source_data("https://github.com/BRL-BCM/ASPRE-analysis/raw/main/dataSet.RData?raw=True"))
+source_url("https://github.com/BRL-BCM/ASPRE-analysis/raw/main/func.R")
+
+#---- get full data_mx with outliers excluded ----
+outliers=c(sampleAttr$sIDs[sampleAttr$consss_batch!="non-outlier"])
+input=list(rmX="Yes",level="zscore",fillThreshold=0.2,DiffThr=0.5,
+           batchEffectCorrectMethod="none",
+          tri2only=FALSE,sampleFeature="ASA_tri_chr",
+           ASA2outliersBoxplot="Include all ASA 2nd trimester samples",measureBoxplot="mean",
+           ImputeMissingValues=TRUE,selectMets=c("glucose","heme"),
+           outliers=outliers)
+temp=PEASA.getDataMxByInput(input)
+metReport=list(data_mx=temp$data_mx,sampleAttr=temp$sampleAttr,input=input)
+rm(list=setdiff(ls(),c(lsf.str(),"metReport","compAnno")))
+
+#---- perform t-test ----
+data_mx=metReport$data_mx
+sampleAttr=metReport$sampleAttr
+
+group=list()
+for ( i in sort(unique(sampleAttr$ASA_tri_chr))){
+  group[[i]]=sampleAttr$sIDs[sampleAttr$ASA_tri_chr==i]
+}
+
+my_comparison=list(
+  c("PLACEBO - 1st Trimester", "PLACEBO - 2nd Trimester"),
+  c("PLACEBO - 1st Trimester", "ASA - 1st Trimester"),
+  c("ASA - 1st Trimester","ASA - 2nd Trimester"),
+  c("PLACEBO - 2nd Trimester","ASA - 2nd Trimester")
+)
+
+p.result=perform_all_t_tests.pair_wise(data_mx,group = group, p.adjust.method = "fdr", paired=FALSE, my_comparison = my_comparison)
+
+yTh=-log10(0.05)
+temp = data.frame(matrix(ncol = 7))
+colnames(temp)=c("x","y","direction","pair","group1","group2","BIOCHEMICAL")
+for (n in 1:length(p.result$comparison_pairs)){
+  df.vol = data.frame(cbind(x=p.result$meanDiff[,n],y=-log10(p.result$p.adj2[,n])))
+  df.vol$direction = rep ("Not Significant",nrow(df.vol))
+  for ( r in 1:nrow(df.vol)){
+    if (is.na(df.vol$y[r])){
+      df.vol$direction[r] = NA
+    }else{
+      if (df.vol$y[r] > yTh){
+        if (df.vol$x[r] <=0){
+          df.vol$direction[r] = "Down"
+        }else{
+          df.vol$direction[r] = "Up"
+        }
+      }
+    }
+  }
+  df.vol$pair=paste0(p.result$comparison_pairs[[n]],collapse = "&")
+  df.vol$group1=sprintf("base:%s",gsub("_"," ",p.result$comparison_pairs[[n]][1]))
+  df.vol$group2=sprintf("exprimental:%s",gsub("_"," ",p.result$comparison_pairs[[n]][2]))
+  df.vol$BIOCHEMICAL=compAnno$BIOCHEMICAL[match(rownames(data_mx),compAnno$COMP_ID)]
+  temp=rbind(temp,df.vol)
+}
+df.vol=temp[-1,]
+metReport[["volcano.ASA_tri.df"]]=df.vol
+rm(list=setdiff(ls(),c(lsf.str(),"metReport","compAnno")))
+
+#--- Table S2 ----
+require(DT)
+require(openxlsx)
+temp=metReport$volcano.ASA_tri.df[metReport$volcano.ASA_tri.df$pair=="PLACEBO_-_2nd_Trimester&ASA_-_2nd_Trimester",]
+if(length(temp$direction!="Not Significant")!=0){
+  temp=temp[temp$direction!="Not Significant",]
+}
+temp=temp[,c("x","y","direction","BIOCHEMICAL")]
+if(dim(temp)[1]!=0){
+  temp$`2nd Trimester Comparison`=TRUE
+}else{
+  temp=NULL
+}
+
+tmp=unique(c(temp$BIOCHEMICAL))
+MOF.df=matrix(ncol = 4)
+MOF.df=data.frame(MOF.df)
+colnames(MOF.df)=c("BIOCHEMICAL","Direction","delta Z","log10(p)")
+for (i in 1:length(tmp)){
+  MOF.df[i,"BIOCHEMICAL"]=tmp[i]
+  MOF.df[i,"Direction"]=ifelse(tmp[i] %in% temp$BIOCHEMICAL,temp$direction[temp$BIOCHEMICAL==tmp[i]],"")
+  MOF.df[i,"delta Z"] = ifelse(tmp[i] %in% temp$BIOCHEMICAL,temp$x[temp$BIOCHEMICAL==tmp[i]],"")
+  MOF.df[i,"log10(p)"] = ifelse(tmp[i] %in% temp$BIOCHEMICAL,temp$y[temp$BIOCHEMICAL==tmp[i]],"")
+}
+Sub_Pathway=compAnno$SUB_PATHWAY[match(MOF.df$BIOCHEMICAL,compAnno$BIOCHEMICAL)]
+HMDB_ID=compAnno$HMDB_ID[match(MOF.df$BIOCHEMICAL,compAnno$BIOCHEMICAL)]
+MOF.df=cbind(cbind(Sub_Pathway,MOF.df),HMDB_ID=HMDB_ID)
+ASA.mets.df=MOF.df
+metReport[["ASA.mets.df"]]=   ASA.mets.df
+
+#draw table
+if (nrow(MOF.df)!=0){
+  df = datatable(MOF.df[order(MOF.df$Sub_Pathway),],
+                 rownames = FALSE,
+                 caption = 'Table S2: Differential metabolites between aspirin-treated samples (n=20) and placebo-treated samples (n=54). *Direction of change and calculation of ∆ z-score is based on comparing aspirin-treated samples against placebo-treated samples. Metabolites are grouped by sub-pathways.',
+                 options = list(scrollX = TRUE,fixedColumns = TRUE, #dom = 't',
+                                pageLength = 10,
+                                lengthMenu = c(10, 20, 50))) %>%
+    formatStyle(columns = colnames(.), fontSize = '50%') %>%
+    formatRound(columns=c('delta Z', 'log10(p)'), digits=3)
+}else{
+  df = datatable(data.frame(messgae=c("Metaboloites with different missing rate between ASA and PLACEBO group not found.")),options = list(dom = 't'))
+  # print("Metaboloites with different missing rate between ASA and PLACEBO group not found.")
+}
+
+df
+dir.output="aspirin.UVA"
+invisible(mkdirs(dir.output))
+write.xlsx(MOF.df,file=sprintf("%s/Table.UVA.xlsx",dir.output))
+```
+
+## Multivariate analysis (MVA)
+  We next performed multivariate analysis (MVA) utilizing Orthogonal Projections to Latent Structures Discriminant Analysis (OPLS-DA) model and reported compliance as continuous measure of aspirin administration. Modeling was done twice to refine the list of aspirin-induced metabolomics alterations, where the second-pass OPLS-DA modeled on 185 metabolites with Variable Importance on Projection (VIP) value >1 in the first-pass.
+
+1. Confined list of aspirin-influenced metabolites at 20-23 weeks’ gestation - **Table S3**.
+2. Results of second-pass OPLS-DA - **Figure 1A,B**
+3. Heatmap of Confined list of aspirin-altered metabolites **Figure 1C**
+
+```{r Aspirin-MVA, include=TRUE,message=FALSE,warning=FALSE,fig.show="hold", out.width="50%"}
+rm(list=ls())
+dir.output="aspirin.MVA"
+invisible(mkdirs(dir.output))
+require(ropls)
+require(R.utils)
+require(reshape2)
+
+invisible(source_data("https://github.com/BRL-BCM/ASPRE-analysis/raw/main/dataSet.RData?raw=True"))
+source_url("https://github.com/BRL-BCM/ASPRE-analysis/raw/main/func.R")
+
+#---- get full data_mx with outliers excluded ----
+outliers=c(sampleAttr$sIDs[sampleAttr$consss_batch!="non-outlier"])
+input=list(rmX="Yes",level="zscore",fillThreshold=0.2,DiffThr=0.5,
+           batchEffectCorrectMethod="none",
+          tri2only=FALSE,sampleFeature="ASA_tri_chr",
+           ASA2outliersBoxplot="Include all ASA 2nd trimester samples",measureBoxplot="mean",
+           ImputeMissingValues=TRUE,selectMets=c("glucose","heme"),
+           outliers=outliers)
+temp=PEASA.getDataMxByInput(input)
+metReport=list(data_mx=temp$data_mx,sampleAttr=temp$sampleAttr,input=input)
+rm(list=setdiff(ls(),c(lsf.str(),"metReport","compAnno")))
+
+#---- First-pass make model for train-only samples to get permutation plot ----
+dir.output="aspirin.MVA"
+TrainSet=c("all","tri2")[2]
+data_mx=metReport$data_mx
+sampleAttr=metReport$sampleAttr
+data_mx=t(data_mx)
+if(TrainSet=="tri2"){
+  train.ind=which(sampleAttr$trimester=="2")
+  data_mx=data_mx[train.ind,]
+  sampleAttr=sampleAttr[train.ind,]
+}
+
+# set response as aspirin compliance
+target=sampleAttr$Compliance....
+names(target)=sampleAttr$sIDs
+
+# make model, list feature variable importance
+# oplsda=opls(data_mx, target,predI = 1, orthoI = NA, plotL=FALSE,permI=50)
+load(sprintf("%s/ASA.oplsda.compliance.train-only.%s.RData",dir.output,TrainSet))
+VIP=oplsda@vipVn
+VIP=VIP[order(VIP,decreasing = T)]
+VIP.df=data.frame(Subpathway=compAnno$SUB_PATHWAY[match(names(VIP),compAnno$COMP_ID)],
+                  BIOCHEMICAL=compAnno$BIOCHEMICAL[match(names(VIP),compAnno$COMP_ID)],
+                  Direction=ifelse(oplsda@loadingMN[match(names(VIP),rownames(oplsda@loadingMN)),]>0,"Up","Down"),
+                  VIP=VIP,
+                  Xloadings=oplsda@loadingMN[match(names(VIP),rownames(oplsda@loadingMN)),]
+                  )
+# save(oplsda,VIP,VIP.df,file=sprintf("%s/ASA.oplsda.compliance.train-only.%s.RData",dir.output,TrainSet))
+rm(list=setdiff(ls(),c(lsf.str(),"metReport","compAnno")))
+
+#---- Second-pass ----
+dir.output="aspirin.MVA"
+TrainSet=c("all","tri2")[2]
+data_mx=metReport$data_mx
+sampleAttr=metReport$sampleAttr
+data_mx=t(data_mx)
+if(TrainSet=="tri2"){
+  train.ind=which(sampleAttr$trimester=="2")
+  data_mx=data_mx[train.ind,]
+  sampleAttr=sampleAttr[train.ind,]
+}
+VIP0=loadToEnv(sprintf("%s/ASA.oplsda.compliance.train-only.%s.RData",dir.output,TrainSet))[["VIP"]]
+VIP0=VIP0[VIP0>1]
+data_mx=data_mx[,colnames(data_mx) %in% names(VIP0)]
+
+# set target as compliance and make model
+target=sampleAttr$Compliance....
+names(target)=sampleAttr$sIDs
+# oplsda=opls(data_mx, target,predI = 1, orthoI = NA, plotL=FALSE,permI=50)
+load(sprintf("%s/ASA2.oplsda.compliance.train-only.%s.RData",dir.output,TrainSet))
+VIP=oplsda@vipVn
+VIP=VIP[order(VIP,decreasing = T)]
+VIP.df=data.frame(COMP_ID=compAnno$COMP_ID[match(names(VIP),compAnno$COMP_ID)],
+                  Subpathway=compAnno$SUB_PATHWAY[match(names(VIP),compAnno$COMP_ID)],
+                  BIOCHEMICAL=compAnno$BIOCHEMICAL[match(names(VIP),compAnno$COMP_ID)],
+                  Direction=ifelse(oplsda@loadingMN[match(names(VIP),rownames(oplsda@loadingMN)),]>0,"Up","Down"),
+                  VIP=VIP,
+                  Xloadings=oplsda@loadingMN[match(names(VIP),rownames(oplsda@loadingMN)),]
+                  )
+save(oplsda,VIP,VIP.df,file=sprintf("%s/ASA2.oplsda.compliance.train-only.%s.RData",dir.output,TrainSet))
+rm(list=setdiff(ls(),c(lsf.str(),"metReport","compAnno","TrainSet","dir.output")))
+
+#---- OPLS-DA score plot ----
+load(sprintf("%s/ASA2.oplsda.compliance.train-only.%s.RData",dir.output,TrainSet))
+p=ropls.plot(oplsda,plottype = "score", xvar = "p1", yvar = "o1", hotelling=T)+theme_bw() +
+  labs(title = "OPLS Score plot of Training Set")
+require(svglite)
+ggsave(p,filename = sprintf("%s/ASA2.scoreplot.svg",dir.output),height = 4,width = 4,device = svglite)
+ggsave(p,filename = sprintf("%s/ASA2.scoreplot.pdf",dir.output),height = 4,width = 4,device = cairo_pdf)
+p1=p
+
+#---- plot model R2Y Q2Y metrics ----
+df=oplsda@summaryDF[,c("R2Y(cum)","Q2(cum)","pre","ort","pR2Y","pQ2")]
+colnames(df)=c("R2Y","Q2","pre","ort","pR2Y","pQ2")
+knitr::kable(oplsda@summaryDF)
+
+df=data.frame(oplsda@suppLs$permMN[,c("R2Y(cum)","Q2(cum)","sim")])
+colnames(df)=c("R2Y(cum)","Q2(cum)","sim")
+df[,"n"]=rownames(df)
+df=melt(df,id.vars = c("n","sim"),variable.name = "performance")
+p=ggplot(df,aes_string(x="sim",y="value",color ="performance")) + geom_point() + theme_bw() +
+  xlab("Similarity(response,perm-response)")
+p=p+theme_bw()+theme(legend.position = c(0.75,0.3))+xlab("Reported compliance")+ylab("Predicted compliance") +labs(title = "Validation plot of the OPLS-DA model obtained from 50 permutation tests")
+ggsave(p,filename = sprintf("%s/ASA2.modelmetrics.svg",dir.output),height = 4,width = 4,device = svglite)
+ggsave(p,filename = sprintf("%s/ASA2.modelmetrics.pdf",dir.output),height = 4,width = 4,device = cairo_pdf)
+p2=p
+p1
+p2
+
+rm(list=setdiff(ls(),c(lsf.str(),"metReport","compAnno","TrainSet","dir.output")))
+
+#---plot pheatmap----
+dir.output="aspirin.MVA"
+TrainSet=c("all","tri2")[2]
+data_mx=metReport$data_mx
+sampleAttr=metReport$sampleAttr
+data_mx=t(data_mx)
+if(TrainSet=="tri2"){
+  train.ind=which(sampleAttr$trimester=="2")
+  data_mx=data_mx[train.ind,]
+  sampleAttr=sampleAttr[train.ind,]
+}
+data_mx=t(scale(data_mx,center =T, scale = T))
+# data_mx=t(scale(data_mx,center =T, scale = T))
+# data_mx=t(data_mx)
+# data_mx=t(apply(data_mx,1,function(x) scale(x,center = median(x,na.rm = T),scale = mad(x,na.rm = T)))) #rescale
+
+VIP0.df=loadToEnv(sprintf("%s/ASA2.oplsda.compliance.train-only.%s.RData",dir.output,TrainSet))[["VIP.df"]]
+VIP0.df=VIP0.df[VIP0.df$VIP>1,]
+df=data_mx[VIP0.df$COMP_ID[order(VIP0.df$Subpathway)],]
+# df=df[rownames(df)!="22185",]
+df=t(df)
+df=t(imputeMissingValues(df,df))
+# df=t(scale(t(df),center = T,scale = T)) #rescale
+
+# df=df[,sampleAttr$sIDs[order(sampleAttr$ASA_tri_chr)]]
+
+rownames(df)=paste0(compAnno$SUB_PATHWAY[match(rownames(df),compAnno$COMP_ID)]," - ",compAnno$BIOCHEMICAL[match(rownames(df),compAnno$COMP_ID)])
+
+require(pheatmap)
+ require(viridis)
+plot.pheatmap.colannotation=function(df,sampleAttr,clusterSample=TRUE,showRownames=FALSE,showColnames=FALSE){
+  brks = quantile(df, probs = seq(.01, .99, .02), na.rm = TRUE)
+  my_sample_col=data.frame(ASA_tri_chr=sampleAttr[order(sampleAttr$ASA_tri_chr),c("ASA_tri_chr")])
+  rownames(my_sample_col)=sampleAttr$sIDs
+  colnames(my_sample_col)=c("Group")
+  my_colour = list(
+  Group = c("#66C2A5","#FC8D62")
+)
+  names(my_colour[["Group"]])=unique(my_sample_col[,"Group"])
+  if(clusterSample){
+      x=pheatmap(df,
+         border_color= NA,
+         show_rownames= showRownames,
+         show_colnames = showColnames,
+         cluster_rows =T,
+         drop_levels = T,
+         breaks            = brks,
+         color             = inferno(length(brks) - 1),
+         # color             = colorpanel(length(brks) - 1, "green", "black", "red"),
+         clustering_distance_cols = "euclidean",
+         clustering_distance_rows = "euclidean",
+         clustering_method = "mcquitty", #"mcquitty" "average"
+         annotation_col    = my_sample_col,
+         # annotation_row = my_row_col,
+         annotation_colors = my_colour,
+         fontsize          = 8)
+  }else{
+        x=pheatmap(df,
+         border_color= NA,
+         show_rownames= showRownames,
+         show_colnames = showColnames,
+         cluster_rows =T,
+         drop_levels = T,
+         breaks            = brks,
+         # color             = inferno(length(brks) - 1),
+         color             = colorpanel(length(brks) - 1, "green", "black", "red"),
+         cluster_cols = FALSE,
+         # clustering_distance_cols = "euclidean", clustering_method = "mcquitty",
+         # clustering_distance_rows = "correlation", clustering_method = "average",
+         gaps_col = cumsum(sapply(sort(unique(gsub(" \\(.*$","",sampleAttr$ASA_tri_chr))), function(x) length(grep(x,sampleAttr$ASA_tri_chr)))),
+         annotation_col    = my_sample_col,
+         # annotation_row = my_row_col,
+         annotation_colors = my_colour,
+         # drop_levels       = TRUE,
+         fontsize          = 8)
+  }
+
+  return(x)
+}
+
+# x=plot.pheatmap.colannotation(df,sampleAttr = sampleAttr,clusterSample=TRUE,showRownames=TRUE)
+# dim(data_mx)
+
+```
+
+# Protective effects of aspirin depend on internal exposure ascertained from metabolomics data
+
+The current study included variability in reported compliance and variability in internal exposure to aspirin ascertained directly from the metabolomics data. We next asked if the joined and individual correlation of these factors with the outcome as preeclampsia would be consistent with protective effects of aspirin.
+
+1. Within the aspirin treated group, participants who developed preeclampsia tended to be less compliant than participants without preeclampsia; However the predicted compliance, a measure of internal exposure to aspirin, showed stronger association  - **Figure 2A,B**
+2. To investigate whether the reported compliance, the level of internal aspirin exposure or both were predictive of preeclampsia, logistic regression was conducted on reported compliance, predicted compliance and both variables in combination. We then compare these  models using Akaike information criterion (AIC). - **Figure 2C**.
+```{r Aspirin-internalExposure-PE, include=TRUE,message=FALSE,warning=FALSE,fig.show="hold", out.width="50%"}
+rm(list=ls())
+require(ropls)
+require(R.utils)
+
+invisible(source_data("https://github.com/BRL-BCM/ASPRE-analysis/raw/main/dataSet.RData?raw=True"))
+source_url("https://github.com/BRL-BCM/ASPRE-analysis/raw/main/func.R")
+
+#---- get full data_mx with outliers excluded ----
+outliers=c(sampleAttr$sIDs[sampleAttr$consss_batch!="non-outlier"])
+input=list(rmX="Yes",level="zscore",fillThreshold=0.2,DiffThr=0.5,
+           batchEffectCorrectMethod="none",
+          tri2only=FALSE,sampleFeature="ASA_tri_chr",
+           ASA2outliersBoxplot="Include all ASA 2nd trimester samples",measureBoxplot="mean",
+           ImputeMissingValues=TRUE,selectMets=c("glucose","heme"),
+           outliers=outliers)
+temp=PEASA.getDataMxByInput(input)
+metReport=list(data_mx=temp$data_mx,sampleAttr=temp$sampleAttr,input=input)
+rm(list=setdiff(ls(),c(lsf.str(),"metReport","compAnno")))
+
+# #-----make 20-fold CV model----
+dir.output="aspirin.MVA"
+invisible(mkdirs(dir.output))
+TrainSet=c("all","tri2")[2]
+data_mx=metReport$data_mx
+sampleAttr=metReport$sampleAttr
+data_mx=t(data_mx)
+if(TrainSet=="tri2"){
+  train.ind=which(sampleAttr$trimester=="2")
+  data_mx=data_mx[train.ind,]
+  sampleAttr=sampleAttr[train.ind,]
+}
+data_mx=t(data_mx)
+
+require(caret)
+# folds <- createFolds(1:dim(sampleAttr)[1], k =20,  list = TRUE, returnTrain = FALSE)
+# oplsda.cv=list()
+# for (i in names(folds)){
+#   oplsda.cv[[i]]=opls(data_mx, target,predI = 1, orthoI = NA, plotL=FALSE, subset=(1:nrow(data_mx))[-folds[[i]]])
+# 
+# }
+# save(folds,oplsda.cv,file=sprintf("%s/ASA2.oplsda.cv.compliance.%s.RData",dir.output,TrainSet))
+load(sprintf("%s/ASA2.oplsda.cv.compliance.%s.RData",dir.output,TrainSet))
+Ypred.cv=rep(NA,dim(sampleAttr)[1])
+names(Ypred.cv)=sampleAttr$sIDs
+
+for (i in names(folds)){
+  Ypred.cv[rownames(oplsda.cv[[i]]@suppLs$yTesMN)]=as.vector(oplsda.cv[[i]]@suppLs$yTesMN)
+}
+Yactual=sampleAttr$Compliance....
+names(Yactual)=sampleAttr$sIDs
+require(caret)
+rmse=RMSE(Ypred.cv,Yactual)
+knitr::kable(data.frame(`Cross Validation 20-fold `=sprintf("RMSE: %.3f",rmse)))
+
+df=data.frame(sampleID=names(Ypred.cv),Actual=Yactual,Predicted=Ypred.cv,Subset="train",group=sampleAttr$ASA)
+# df$group=paste0(sampleAttr$ASA_tri_chr,sep=" PE",as.factor(sampleAttr$pe))
+df$group=paste0(ifelse(sampleAttr$ASA,"aspirin-treated","placebo-treated"),sep=", ",ifelse(sampleAttr$pe,"preeclamptic","non-preeclamptic"))
+df$group=as.character(df$group)
+df$group=gsub("ASA","aspirin",df$group)
+df$group=gsub("PLACEBO","placebo",df$group)
+# draw plot
+p=ggplot(df, aes_string(x = "Predicted", y = "Actual",col="group",label="sampleID")) +
+  geom_point()
+p=p+theme_bw()+theme(legend.position = c(0.35,0.5),
+                   legend.title = element_blank()
+                   # legend.text=element_text(size=8)
+                   )+
+  xlab("Predicted Compliance")+ylab("Reported Compliance")
+p1=p
+ggsave(p,filename = sprintf("%s/Aspirin.PredictedVsActual.PEoverlay.pdf",dir.output),height = 4,width = 4,device = cairo_pdf)
+ggsave(p,filename = sprintf("%s/Aspirin.PredictedVsActual.PEoverlay.svg",dir.output),height = 4,width = 4,device = svglite)
+
+#---- predicted compliance independently predicts preeclampsia development ----
+require(ggpubr)
+require(reshape2)
+temp=df[grep("aspirin",df$group),c("sampleID","Actual","Predicted","group")]
+colnames(temp)=c("sampleID","Reported compliance","Predicted compliance","group")
+temp=melt(temp,id.vars = c("sampleID","group"),variable.name = "type")
+temp$group=factor(temp$group,levels = c("aspirin-treated, preeclamptic","aspirin-treated, non-preeclamptic"))
+
+p = ggboxplot(temp, x = "group", y = "value",color = "group",
+              facet.by="type",palette = "npg")+
+  # stat_pvalue_manual(stat.test, label ="{p.adj}{p.adj.signif}", tip.length = 0.01) +
+  stat_compare_means( label = "p", label.x = 1.5,method = "t.test") +
+  ylab("value") +theme(axis.text.x=element_blank())
+p2=p
+ggsave(p,filename = sprintf("%s/Aspirin.ReportedVsPredictedCompliance.PE.pdf",dir.output),height = 4,width = 4,device = cairo_pdf)
+ggsave(p,filename = sprintf("%s/Aspirin.ReportedVsPredictedCompliance.PE.svg",dir.output),height = 4,width = 4,device = svglite)
+
+p1
+p2
+
+require(pROC)
+Ypred.cv=ifelse(Ypred.cv<50,"0","1")
+Yactual=as.numeric(sampleAttr$ASA)
+ROC=roc(Yactual,as.numeric(Ypred.cv))
+
+# AIC
+temp=df[grep("aspirin",df$group),c("sampleID","Actual","Predicted","group")]
+colnames(temp)=c("sampleID","Reported compliance","Predicted compliance","group")
+require(stringr)
+require(MuMIn)
+temp$PE=as.numeric(!grepl("non-",temp$group))
+# ml.reportedCompliance=lm(PE~`Reported compliance`,temp)
+glm.reportedCompliance=glm(PE~`Reported compliance`,family=binomial(link='logit'),temp)
+AUC.reportedCompliance=auc(roc(temp$PE,glm.reportedCompliance$fitted.values))
+
+# ml.predictedCompliance=lm(PE~`Predicted compliance`,temp)
+glm.predictedCompliance=glm(PE~`Predicted compliance`,family=binomial(link='logit'),temp)
+AUC.predictedCompliance=auc(roc(temp$PE,glm.predictedCompliance$fitted.values))
+
+# ml.combinedCompliance=lm(PE~`Reported compliance`+`Predicted compliance`,temp)
+glm.combinedCompliance=glm(PE~`Reported compliance`+`Predicted compliance`,family=binomial(link='logit'),temp)
+AUC.combinedCompliance=auc(roc(temp$PE,glm.combinedCompliance$fitted.values))
+AIC.df=data.frame(Model=c("Reported Compliance","Predicted compliance","Reported Compliance + Predicted compliance"),
+           K=c(1,1,2),
+           AUC=c(AUC.reportedCompliance,AUC.predictedCompliance,AUC.combinedCompliance),
+           AICc=c(AICc(glm.reportedCompliance),AICc(glm.predictedCompliance),AICc(glm.combinedCompliance))
+           )
+require(openxlsx)
+knitr::kable(AIC.df)
+write.xlsx(AIC.df,file = sprintf("%s/ASA2.AIC.predCompliance2PE.xlsx",dir.output),rowNames=T)
+```
+
+# Aspirin treatment slows down the metabolic clock of gestation
+
+```{r PREG-MVA, include=TRUE,message=FALSE,warning=FALSE,fig.show="hold", out.width="33%"}
+rm(list=ls())
+dir.output="PREG.MVA"
+invisible(mkdirs(dir.output))
+require(ropls)
+require(R.utils)
+require(reshape2)
+
+invisible(source_data("https://github.com/BRL-BCM/ASPRE-analysis/raw/main/dataSet.RData?raw=True"))
+source_url("https://github.com/BRL-BCM/ASPRE-analysis/raw/main/func.R")
+
+#---- get full data_mx with outliers excluded ----
+outliers=c(sampleAttr$sIDs[sampleAttr$consss_batch!="non-outlier"])
+input=list(rmX="Yes",level="zscore",fillThreshold=0.2,DiffThr=0.5,
+           batchEffectCorrectMethod="none",
+          tri2only=FALSE,sampleFeature="ASA_tri_chr",
+           ASA2outliersBoxplot="Include all ASA 2nd trimester samples",measureBoxplot="mean",
+           ImputeMissingValues=TRUE,selectMets=c("glucose","heme"),
+           outliers=outliers)
+temp=PEASA.getDataMxByInput(input)
+metReport=list(data_mx=temp$data_mx,sampleAttr=temp$sampleAttr,input=input)
+rm(list=setdiff(ls(),c(lsf.str(),"metReport","compAnno")))
+
+#---- make model for train-only to get permutation plot ----
+dir.output="PREG.MVA"
+invisible(mkdirs(dir.output))
+data_mx=metReport$data_mx
+sampleAttr=metReport$sampleAttr
+data_mx=t(data_mx)
+
+train.ind=which(!sampleAttr$ASA| sampleAttr$trimester=="1")
+data_mx=data_mx[train.ind,]
+sampleAttr=sampleAttr[train.ind,]
+
+target=sampleAttr$ga.w
+names(target)=sampleAttr$sIDs
+
+# oplsda=opls(data_mx, target,predI = 1, orthoI = NA, plotL=FALSE,permI=50)
+# save(oplsda,file=sprintf("%s/PREG.oplsda.ga-w.train-only.tri1_and_placebo2.RData",dir.output))
+
+#---- model performance table: permutation  ----
+# load(sprintf("%s/PREG.oplsda.ga-w.train-only.tri1_and_placebo2.RData",dir.output))
+# knitr::kable(oplsda@summaryDF)
+
+#---- make model for training and testing ----
+data_mx=metReport$data_mx
+sampleAttr=metReport$sampleAttr
+data_mx=t(data_mx)
+
+target=sampleAttr$ga.w
+names(target)=sampleAttr$sIDs
+train.ind=which(!sampleAttr$ASA | sampleAttr$trimester=="1")
+# oplsda=opls(data_mx, target,predI = 1, orthoI = NA, subset=train.ind, plotL=FALSE)
+# save(oplsda,file=sprintf("%s/PREG.oplsda.ga-w.train.tri1_and_placebo2.RData",dir.output))
+
+load(sprintf("%s/PREG.oplsda.ga-w.train.tri1_and_placebo2.RData",dir.output))
+
+#----Model performance: Goodness of fit table----
+knitr::kable(oplsda@summaryDF)
+
+#----plot predicted-actual with both training and testing----
+predictedY=rep(NA,length(sampleAttr$sIDs))
+subset=rep(NA,length(sampleAttr$sIDs))
+for (i in 1:length(predictedY)){
+  if (i %in% train.ind){
+    j=which(train.ind==i)
+    predictedY[i]=oplsda@suppLs$yPreMN[j]
+    subset[i]="train"
+  }else{
+    j=which((1:length(oplsda@suppLs$yMCN))[-train.ind]==i)
+    predictedY[i]=oplsda@suppLs$yTesMN[j]
+    subset[i]="test"
+  }
+
+}
+df=data.frame(sampleID=rownames(oplsda@suppLs$yMCN),Actual=as.vector(oplsda@suppLs$yMCN),Predicted=predictedY,Subset=subset,group=sampleAttr$ASA_tri_chr[match(rownames(oplsda@suppLs$yMCN),sampleAttr$sIDs)])
+df$group=as.character(df$group)
+df$group=replace(df$group,grep("1st",df$group),"1st trimester, pre-treatment")
+df$group=replace(df$group,grep("PLACEBO - 2nd Trimester",df$group),"2nd trimester, placebo-treated")
+df$group=replace(df$group,grep("ASA - 2nd Trimester",df$group),"2nd trimester, aspirin-treated")
+
+# draw plot
+p=ggplot(df, aes_string(x = "Actual", y = "Predicted",label="sampleID")) + theme_bw()+theme(legend.position = c(0.31,0.88),legend.title = element_blank(),legend.background = element_rect(fill=alpha('white', 0.0)))+
+  xlab("True GA")+ylab("Predicted GA") +
+  geom_point(aes_string(col="group")) + geom_smooth(method='lm')
+p1=p
+ggsave(p,filename = sprintf("%s/PREG.actual-predict.pdf",dir.output),height = 4,width = 4,device = cairo_pdf)
+ggsave(p,filename = sprintf("%s/PREG.actual-predict.svg",dir.output),height = 4,width = 4,device = svglite)
+# ggplotly(p)
+
+# density plot
+colorby="group"
+p = ggplot(df, aes_string(x="Predicted",fill=colorby))+
+  geom_density(alpha=0.4)
+p= p + xlab("Predicted GA (weeks)") + ylab("Density") +theme_bw()+theme(legend.position = c(0.7,0.9),legend.title = element_blank(),legend.background = element_rect(fill=alpha('white', 0.1)))
+p2=p
+ggsave(p,filename = sprintf("%s/PREG.PredictedGAdensity.pdf",dir.output),height = 4,width = 4,device = cairo_pdf)
+ggsave(p,filename = sprintf("%s/PREG.PredictedGAdensity.svg",dir.output),height = 4,width = 4,device = svglite)
+
+#residual plot
+model<-lm(Predicted~Actual,data=df[df$group!="2nd trimester, aspirin-treated",])
+require(Metrics)
+knitr::kable(data.frame(MAE=mae(df$Actual[df$group!="2nd trimester, aspirin-treated"],df$Predicted[df$group!="2nd trimester, aspirin-treated"]),
+                        `R-squre`=(summary(model))$adj.r.squared))
+resd=df$Predicted-stats::predict(model,newdata=df)
+names(resd)=df$sampleID
+df$lm.resd=resd
+require(ggpubr)
+knitr::kable(df %>% group_by(group) %>% summarise(mean=mean(lm.resd)))
+stat.mean=compare_means(lm.resd ~ group,  data = df,
+              ref.group = ".all.", method = "t.test",p.adjust.method = "bonferroni") %>% rstatix::add_significance("p.adj")
+df$group=factor(df$group,levels = c("1st trimester, pre-treatment","2nd trimester, aspirin-treated","2nd trimester, placebo-treated"))
+p = ggboxplot(df, x = "group", y = "resd",col="group",add = "jitter") + #rotate_x_text(angle = 90) +
+  stat_compare_means(method = "anova", label.y = 6) +        # Add global annova p-value
+  stat_pvalue_manual(stat.mean,label = "p.adj.signif",x="group2",y.position = 5)+
+  ylab("residual GA (weeks)") + xlab("") + theme(axis.text.x = element_blank(),legend.title = element_blank(), legend.direction = "vertical")
+p3=p
+ggsave(p,filename = sprintf("%s/PREG.ResidualGA.pdf",dir.output),height = 4,width = 4,device = cairo_pdf)
+ggsave(p,filename = sprintf("%s/PREG.ResidualGA.svg",dir.output),height = 4,width = 4,device = svglite)
+save(df,file=sprintf("%s/PREG.actual_pred_resd.RData",dir.output))
+p1
+p2
+p3
+```
+
+# Combined effects of aspirin treatment on preeclampsia prevention and the gestational age advancement
+
+```{r ASA-PREG-PE, include=TRUE,message=FALSE,warning=FALSE}
+
+rm(list=ls())
+dir.output="CombinedEffect"
+invisible(mkdirs(dir.output))
+require(ropls)
+require(R.utils)
+require(reshape2)
+
+invisible(source_data("https://github.com/BRL-BCM/ASPRE-analysis/raw/main/dataSet.RData?raw=True"))
+source_url("https://github.com/BRL-BCM/ASPRE-analysis/raw/main/func.R")
+
+#---- get full data_mx with outliers excluded ----
+outliers=c(sampleAttr$sIDs[sampleAttr$consss_batch!="non-outlier"])
+input=list(rmX="Yes",level="zscore",fillThreshold=0.2,DiffThr=0.5,
+           batchEffectCorrectMethod="none",
+          tri2only=FALSE,sampleFeature="ASA_tri_chr",
+           ASA2outliersBoxplot="Include all ASA 2nd trimester samples",measureBoxplot="mean",
+           ImputeMissingValues=TRUE,selectMets=c("glucose","heme"),
+           outliers=outliers)
+temp=PEASA.getDataMxByInput(input)
+metReport=list(data_mx=temp$data_mx,sampleAttr=temp$sampleAttr,input=input)
+rm(list=setdiff(ls(),c(lsf.str(),"metReport","compAnno")))
+
+#---- make model for train-only to get permutation plot ----
+dir.output="CombinedEffect"
+data_mx=metReport$data_mx
+sampleAttr=metReport$sampleAttr
+require(R.utils)
+require(openxlsx)
+temp=loadToEnv("/Volumes/Seagate-2C/BaylorMHG/PE_ASA/1st_052820/MVA_none_144/internalexposure.RData")[["df"]]
+InternalExposure=temp$Predicted
+names(InternalExposure)=temp$sampleID
+
+
+temp=loadToEnv("/Volumes/Seagate-2C/BaylorMHG/PE_ASA/1st_052820/MVA_none_144/PREG.actual_pred_resd.RData")[["df"]]
+GA.resd=temp$lm.resd
+names(GA.resd)=temp$sampleID
+#test model correlation
+tmp=temp[sampleAttr$ASA_tri!="TRUE2",]
+cor.test(tmp$Actual,tmp$Predicted)
+
+TrainSet="tri2"
+# ASA.met=loadToEnv(sprintf("/Volumes/Seagate-2C/BaylorMHG/PE_ASA/1st_052820/MVA_none_144/ASA2.VIP.oplsda.compliance.train-only.%s.RData",TrainSet))[["VIP.df"]]
+# ASA.met=loadToEnv(sprintf("/Volumes/Seagate-2C/BaylorMHG/PE_ASA/1st_052820/MVA_none_144/ASA.VIP.oplsda.compliance.train-only.%s.RData",TrainSet))[["VIP.df"]]
+ASA.met=loadToEnv(sprintf("/Volumes/Seagate-2C/BaylorMHG/PE_ASA/1st_052820/MVA_none_144/ASA.VIPfrom0.oplsda.compliance.train-only.%s.RData",TrainSet))[["VIP.df"]]
+
+# ASA.met=loadToEnv(sprintf("/Volumes/Seagate-2C/BaylorMHG/PE_ASA/1st_052820/MVA_none_144/ASA2.VIPfom0.oplsda.compliance.train.%s.RData",TrainSet))[["VIP.df"]]
+ASA.met.VIP=ASA.met$VIP
+names(ASA.met.VIP)=ASA.met$BIOCHEMICAL
+ASA.met.xloadings=ASA.met$Xloadings
+names(ASA.met.xloadings)=ASA.met$BIOCHEMICAL
+ASA.met=rownames(ASA.met)
+ASA.meanDiff=loadToEnv("/Volumes/Seagate-2C/BaylorMHG/PE_ASA/1st_052820/UVA/ASA.ttest.none.144.RData")[["df.vol"]]
+                                                                                                       
+                                                                                                       
+ASA.res.met=read.xlsx("/Volumes/Seagate-2C/BaylorMHG/PE_ASA/1st_052820/UVA/ASA_PE_4group.xlsx",sheet = 1)
+# ASA.res.met=ASA.res.met[ASA.res.met$P.ASA_PE0.ASA_PE1<0.05,]
+ASA.res.met=ASA.res.met[order(ASA.res.met$P.ASA_PE0.ASA_PE1),]
+ASA.res.met.p=ASA.res.met$P.ASA_PE0.ASA_PE1
+names(ASA.res.met.p)=ASA.res.met$BIOCHEMICAL
+ASA.res.met.meanDiff=read.xlsx("/Volumes/Seagate-2C/BaylorMHG/PE_ASA/1st_052820/UVA/ASA_PE_4group.xlsx",sheet = 4)
+ASA.res.met.meanDiff=ASA.res.met.meanDiff$MeanDiff.ASA_PE1.ASA_PE0[match(ASA.res.met$BIOCHEMICA,ASA.res.met.meanDiff$BIOCHEMICAL)]
+names(ASA.res.met.meanDiff)=ASA.res.met$BIOCHEMICAL
+ASA.res.met=compAnno$COMP_ID[match(ASA.res.met$BIOCHEMICAL,compAnno$BIOCHEMICAL)]
+
+
+
+
+TrainSet="tri2"
+ASAonPREG.met=loadToEnv(file=sprintf("/Volumes/Seagate-2C/BaylorMHG/PE_ASA/1st_052820/MVA_none_144/ASAonPREG.loadings.df.ASA%s.RData",TrainSet))[["df"]]
+ASAonPREG.met=ASAonPREG.met[ASAonPREG.met$Col=="ASA impacted",]
+ASAonPREG.met=rownames(ASAonPREG.met)
+
+# PREG.met=loadToEnv(file="/Volumes/Seagate-2C/BaylorMHG/PE_ASA/1st_052820/MVA_none_144/PREG.VIP.oplsda.ga-w.train.tri1_and_placebo2.RData")[["VIP.df"]]
+PREG.met=loadToEnv(file="/Volumes/Seagate-2C/BaylorMHG/PE_ASA/1st_052820/MVA_none_144/PREG.VIPfom0.oplsda.ga-w.train.tri1_and_placebo2.RData")[["VIP.df"]]
+PREG.met.VIP=PREG.met$VIP
+names(PREG.met.VIP)=PREG.met$BIOCHEMICAL
+PREG.met.xloadings=PREG.met$Xloadings
+names(PREG.met.xloadings)=PREG.met$BIOCHEMICAL
+PREG.met=rownames(PREG.met)
+
+PREG.ttest=loadToEnv(file="/Volumes/Seagate-2C/BaylorMHG/PE_ASA/1st_052820/UVA/ASA_tri_4groups_ttest.144.none.RData")[["df.vol"]]
+PREG.ttest=PREG.ttest[PREG.ttest$pair=="PLACEBO_-_1st_Trimester&PLACEBO_-_2nd_Trimester",]
+# PREG.ttest[order(PREG.ttest$y),]
+length(unique(c(ASA.met,ASA.res.met,ASAonPREG.met)))
+rm(temp,TrainSet)
+
+
+
+```
