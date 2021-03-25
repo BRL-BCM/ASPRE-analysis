@@ -1,6 +1,6 @@
 # ASPRE-analysis
 
-This repository hosts code and dataset supporting all foundings in "Effective aspirin treatment of women at risk for preeclampsia delays the metabolic clock of gestation", including:
+This repository hosts code and dataset supporting all findings in "Effective aspirin treatment of women at risk for preeclampsia delays the metabolic clock of gestation", including:
 
 1. Data quanlity control
 2. Metabolites and pathways affected by aspirin treatment
