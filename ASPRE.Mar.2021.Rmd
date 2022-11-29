@@ -16,8 +16,8 @@ editor_options:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-knitr::opts_knit$set(root.dir = "/Volumes/Seagate-2C/BaylorMHG/PE_ASA/ASPRE-analysis/data")
-setwd("/Volumes/Seagate-2C/BaylorMHG/PE_ASA/ASPRE-analysis/data")
+knitr::opts_knit$set(root.dir = "data")
+setwd("data")
 ```
 
 ## Data Quality Control
