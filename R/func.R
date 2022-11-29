@@ -453,7 +453,6 @@ is_outlier1 <- function(x) {
 
 PEASA.getDataMxByInput=function(input){
   #----get data_mx----
-  load(file = "/Volumes/Seagate-2C/BaylorMHG/PE_ASA/1st_052820/dataSet_new_compID.RData")
   metReport=list()
   #----input----
   rmX=input$rmX
